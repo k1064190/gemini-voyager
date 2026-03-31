@@ -6,6 +6,7 @@ import {
   detectAccountPlatformFromUrl,
   extractRouteUserIdFromUrl,
 } from '@/core/services/AccountIsolationService';
+import { LocalFolderSyncService } from '@/core/services/LocalFolderSyncService';
 import { StorageKeys } from '@/core/types/common';
 import type { FolderData } from '@/core/types/folder';
 import type {
@@ -13,9 +14,10 @@ import type {
   SyncAccountScope,
   SyncMode,
   SyncPlatform,
+  SyncProvider,
   SyncState,
 } from '@/core/types/sync';
-import { DEFAULT_SYNC_STATE } from '@/core/types/sync';
+import { DEFAULT_SYNC_STATE, SyncStorageKeys } from '@/core/types/sync';
 import { isSafari } from '@/core/utils/browser';
 import type { StarredMessagesData } from '@/pages/content/timeline/starredTypes';
 
@@ -74,6 +76,8 @@ export function CloudSyncSettings() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [platform, setPlatform] = useState<SyncPlatform>('gemini');
+  const [selectedProvider, setSelectedProvider] = useState<SyncProvider>('google-drive');
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
 
   const getBaseFolderStorageKey = useCallback(
     (targetPlatform: SyncPlatform) =>
@@ -165,8 +169,19 @@ export function CloudSyncSettings() {
       setPlatform(detected);
       console.log('[CloudSyncSettings] Detected platform:', detected);
     };
+    const initProvider = async () => {
+      try {
+        const result = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+        if (result[SyncStorageKeys.PROVIDER] === 'local-folder') {
+          setSelectedProvider('local-folder');
+        }
+      } catch {
+        // Storage unavailable — keep default
+      }
+    };
     fetchState();
     initPlatform();
+    initProvider();
   }, [detectPlatform]);
 
   // Format timestamp for display
@@ -253,6 +268,18 @@ export function CloudSyncSettings() {
       console.error('[CloudSyncSettings] Sign out failed:', error);
     }
   }, []);
+
+  const saveProvider = useCallback(async (provider: SyncProvider) => {
+    setSelectedProvider(provider);
+    setShowProviderPicker(false);
+    try {
+      await chrome.storage.local.set({ [SyncStorageKeys.PROVIDER]: provider });
+    } catch {
+      // Storage unavailable
+    }
+  }, []);
+
+  const isLocalFolderSupported = LocalFolderSyncService.isSupported();
 
   // Handle sync now (upload current data)
   const handleSyncNow = useCallback(async () => {
@@ -349,6 +376,18 @@ export function CloudSyncSettings() {
       setIsUploading(false);
     }
   }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, t]);
+
+  const handleProviderSelect = useCallback(
+    async (provider: SyncProvider) => {
+      await saveProvider(provider);
+      if (provider === 'google-drive') {
+        handleSyncNow();
+      } else {
+        chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/local-sync/index.html') });
+      }
+    },
+    [handleSyncNow, saveProvider],
+  );
 
   // Handle download from Drive (restore data) - NOW MERGES instead of overwrite
   const handleDownloadFromDrive = useCallback(async () => {
@@ -597,46 +636,85 @@ export function CloudSyncSettings() {
           <>
             {/* Upload/Download Buttons */}
             <div className="flex gap-2">
-              {/* Upload Button (Local → Drive) */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="group hover:border-primary/50 flex-1"
-                onClick={handleSyncNow}
-                disabled={isUploading || isDownloading}
-              >
-                <span className="flex items-center gap-1 text-xs transition-transform group-hover:scale-105">
-                  {isUploading ? (
-                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
+              <div className="flex-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="group hover:border-primary/50 w-full"
+                  onClick={() => setShowProviderPicker(true)}
+                  disabled={isUploading || isDownloading}
+                >
+                  <span className="flex items-center gap-1 text-xs transition-transform group-hover:scale-105">
+                    {isUploading ? (
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
                         stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                        strokeWidth="2"
+                      >
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                      </svg>
+                    )}
+                    {t('syncUpload')}
+                    <span className="text-muted-foreground ml-0.5 text-[10px]">
+                      {selectedProvider === 'google-drive' ? '☁️' : '📁'}
+                    </span>
+                  </span>
+                </Button>
+
+                {showProviderPicker && (
+                  <div className="bg-background mt-1 rounded-lg border p-1 shadow-lg">
+                    <button
+                      className="hover:bg-secondary flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs"
+                      onClick={() => handleProviderSelect('google-drive')}
                     >
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-                    </svg>
-                  )}
-                  {t('syncUpload')}
-                </span>
-              </Button>
+                      <span>☁️</span>
+                      <span>Google Drive</span>
+                    </button>
+                    <button
+                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${
+                        isLocalFolderSupported
+                          ? 'hover:bg-secondary'
+                          : 'text-muted-foreground cursor-not-allowed'
+                      }`}
+                      disabled={!isLocalFolderSupported}
+                      onClick={() => isLocalFolderSupported && handleProviderSelect('local-folder')}
+                    >
+                      <span>📁</span>
+                      <span>Local Folder</span>
+                      {!isLocalFolderSupported && (
+                        <span className="text-muted-foreground ml-auto text-[10px]">
+                          Unsupported
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      className="text-muted-foreground hover:bg-secondary w-full rounded px-2 py-1 text-center text-[10px]"
+                      onClick={() => setShowProviderPicker(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Sync Button (Drive → Local) */}
               <Button

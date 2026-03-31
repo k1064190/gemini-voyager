@@ -20,6 +20,12 @@ vi.mock('@/core/utils/browser', () => ({
   isSafari: () => false,
 }));
 
+vi.mock('@/core/services/LocalFolderSyncService', () => ({
+  LocalFolderSyncService: {
+    isSupported: () => true,
+  },
+}));
+
 type MockedChrome = typeof chrome;
 
 const baseState: SyncState = {
@@ -92,7 +98,7 @@ describe('CloudSyncSettings auth flow', () => {
     document.body.appendChild(container);
   });
 
-  it('triggers upload directly without a separate authenticate message', async () => {
+  it('triggers upload after selecting Google Drive from provider picker', async () => {
     const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
       if (message.type === 'gv.sync.getState') {
         return Promise.resolve({ ok: true, state: baseState });
@@ -121,6 +127,16 @@ describe('CloudSyncSettings auth flow', () => {
 
     await act(async () => {
       uploadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    const googleDriveButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('Google Drive'),
+    );
+    expect(googleDriveButton).toBeTruthy();
+
+    await act(async () => {
+      googleDriveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await flushMicrotasks();
 
