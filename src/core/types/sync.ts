@@ -21,6 +21,13 @@ export type SyncMode = 'disabled' | 'manual' | 'auto';
  */
 export type SyncPlatform = 'gemini' | 'aistudio';
 
+/**
+ * Sync provider for upload destination
+ * - google-drive: Sync via Google Drive (default, all browsers)
+ * - local-folder: Sync via local filesystem (Chromium only)
+ */
+export type SyncProvider = 'google-drive' | 'local-folder';
+
 export interface SyncAccountScope {
   accountKey: string;
   accountId: number;
@@ -140,6 +147,7 @@ export const SyncStorageKeys = {
   MODE: 'gvSyncMode',
   LAST_SYNC_TIME: 'gvLastSyncTime',
   SYNC_ERROR: 'gvSyncError',
+  PROVIDER: 'gvSyncProvider',
 } as const;
 
 /**
@@ -165,7 +173,11 @@ export type SyncMessageType =
   | 'gv.sync.upload'
   | 'gv.sync.download'
   | 'gv.sync.getState'
-  | 'gv.sync.setMode';
+  | 'gv.sync.setMode'
+  | 'gv.sync.localUpload'
+  | 'gv.sync.localDownload'
+  | 'gv.sync.localGetState'
+  | 'gv.sync.localPickerComplete';
 
 /**
  * Message payload for sync operations
