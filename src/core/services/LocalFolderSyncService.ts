@@ -20,7 +20,7 @@ import type {
   SyncState,
 } from '@/core/types/sync';
 import { DEFAULT_SYNC_STATE, SyncStorageKeys } from '@/core/types/sync';
-import { loadHandle, saveHandle } from '@/core/utils/idb';
+import { loadHandle, removeHandle, saveHandle } from '@/core/utils/idb';
 
 function getStringValue(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
@@ -29,6 +29,15 @@ function getStringValue(value: unknown): string | null {
 function getNumberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+
+const FILE_NAMES = {
+  folders: 'gemini-voyager-folders.json',
+  prompts: 'gemini-voyager-prompts.json',
+  starred: 'gemini-voyager-starred.json',
+  forks: 'gemini-voyager-forks.json',
+} as const;
+
+const VERSION = '1';
 
 /**
  * File System Access API permission methods not yet in TypeScript DOM lib.
@@ -67,15 +76,87 @@ export class LocalFolderSyncService {
   }
 
   async upload(
-    _folders: FolderData,
-    _prompts: PromptItem[],
-    _starred: StarredMessagesDataSync | null,
+    folders: FolderData,
+    prompts: PromptItem[],
+    starred: StarredMessagesDataSync | null,
     _interactive: boolean,
-    _platform: SyncPlatform,
-    _forks: ForkNodesDataSync | null,
+    platform: SyncPlatform,
+    forks: ForkNodesDataSync | null,
     _accountScope: SyncAccountScope | null,
   ): Promise<boolean> {
-    throw new Error('Not implemented: upload');
+    const handle = await this.getHandle();
+    if (!handle) {
+      this.updateState({ error: 'No folder selected for local sync', isSyncing: false });
+      return false;
+    }
+
+    const hasPermission = await this.verifyPermission(handle);
+    if (!hasPermission) {
+      this.updateState({ error: 'Permission denied for local sync folder', isSyncing: false });
+      return false;
+    }
+
+    this.updateState({ isSyncing: true, error: null });
+
+    try {
+      const now = new Date().toISOString();
+      const isAIStudio = platform === 'aistudio';
+
+      const folderPayload: FolderExportPayload = {
+        format: 'gemini-voyager.folders.v1',
+        exportedAt: now,
+        version: VERSION,
+        data: folders,
+      };
+      await this.writeJsonFile(handle, FILE_NAMES.folders, folderPayload);
+
+      const promptPayload: PromptExportPayload = {
+        format: 'gemini-voyager.prompts.v1',
+        exportedAt: now,
+        version: VERSION,
+        items: prompts,
+      };
+      await this.writeJsonFile(handle, FILE_NAMES.prompts, promptPayload);
+
+      if (starred) {
+        const starredPayload: StarredExportPayload = {
+          format: 'gemini-voyager.starred.v1',
+          exportedAt: now,
+          version: VERSION,
+          data: starred,
+        };
+        await this.writeJsonFile(handle, FILE_NAMES.starred, starredPayload);
+      }
+
+      if (forks) {
+        const forkPayload: ForkExportPayload = {
+          format: 'gemini-voyager.forks.v1',
+          exportedAt: now,
+          version: VERSION,
+          data: forks,
+        };
+        await this.writeJsonFile(handle, FILE_NAMES.forks, forkPayload);
+      }
+
+      const timestamp = Date.now();
+      if (isAIStudio) {
+        this.updateState({ lastUploadTimeAIStudio: timestamp, isSyncing: false });
+      } else {
+        this.updateState({ lastUploadTime: timestamp, isSyncing: false });
+      }
+      await this.saveState();
+      return true;
+    } catch (err: unknown) {
+      const message =
+        err instanceof DOMException
+          ? this.getErrorMessage(err)
+          : err instanceof Error
+            ? err.message
+            : 'Unknown error during upload';
+      this.updateState({ error: message, isSyncing: false });
+      await this.saveState();
+      return false;
+    }
   }
 
   async download(
@@ -88,7 +169,82 @@ export class LocalFolderSyncService {
     starred: StarredExportPayload | null;
     forks: ForkExportPayload | null;
   } | null> {
-    throw new Error('Not implemented: download');
+    const handle = await this.getHandle();
+    if (!handle) {
+      return null;
+    }
+
+    const hasPermission = await this.verifyPermission(handle);
+    if (!hasPermission) {
+      this.updateState({ error: 'Permission denied for local sync folder' });
+      return null;
+    }
+
+    try {
+      const folders = await this.readJsonFile<FolderExportPayload>(handle, FILE_NAMES.folders);
+      const prompts = await this.readJsonFile<PromptExportPayload>(handle, FILE_NAMES.prompts);
+      const starred = await this.readJsonFile<StarredExportPayload>(handle, FILE_NAMES.starred);
+      const forks = await this.readJsonFile<ForkExportPayload>(handle, FILE_NAMES.forks);
+
+      this.updateState({ lastSyncTime: Date.now(), error: null });
+      await this.saveState();
+
+      return { folders, prompts, starred, forks };
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'NotFoundError') {
+        await removeHandle();
+        this.updateState({ error: 'Sync folder no longer available' });
+        return null;
+      }
+      const message = err instanceof Error ? err.message : 'Unknown error during download';
+      this.updateState({ error: message });
+      return null;
+    }
+  }
+
+  private getErrorMessage(err: DOMException): string {
+    switch (err.name) {
+      case 'NotFoundError':
+        return 'Sync folder no longer available. Please select a new folder.';
+      case 'NotAllowedError':
+        return 'Permission denied. Please grant access to the folder.';
+      case 'AbortError':
+        return 'Operation was cancelled.';
+      default:
+        return err.message || 'Unknown file system error';
+    }
+  }
+
+  private async writeJsonFile(
+    handle: FileSystemDirectoryHandle,
+    name: string,
+    data: unknown,
+  ): Promise<void> {
+    const fileHandle = await handle.getFileHandle(name, { create: true });
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(JSON.stringify(data, null, 2));
+    } finally {
+      await writable.close();
+    }
+  }
+
+  private async readJsonFile<T>(
+    handle: FileSystemDirectoryHandle,
+    name: string,
+  ): Promise<T | null> {
+    try {
+      const fileHandle = await handle.getFileHandle(name);
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      if (!text) return null;
+      return JSON.parse(text) as T;
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'NotFoundError') {
+        return null;
+      }
+      return null;
+    }
   }
 
   // ============== Private Methods ==============
