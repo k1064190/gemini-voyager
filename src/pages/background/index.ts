@@ -9,6 +9,7 @@ import {
   extractRouteUserIdFromUrl,
 } from '@/core/services/AccountIsolationService';
 import { googleDriveSyncService } from '@/core/services/GoogleDriveSyncService';
+import { localFolderSyncService } from '@/core/services/LocalFolderSyncService';
 import { StorageKeys } from '@/core/types/common';
 import type { FolderData } from '@/core/types/folder';
 import type { PromptItem, SyncAccountScope, SyncMode } from '@/core/types/sync';
@@ -817,6 +818,81 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               await googleDriveSyncService.setMode(mode);
             }
             sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
+            return;
+          }
+        }
+      }
+
+      // Handle local folder sync operations
+      if (message && message.type && message.type.startsWith('gv.sync.local')) {
+        switch (message.type) {
+          case 'gv.sync.localUpload': {
+            const {
+              folders,
+              prompts,
+              interactive,
+              platform: rawPlatform,
+              accountScope: rawScope,
+            } = message.payload as {
+              folders: FolderData;
+              prompts: PromptItem[];
+              interactive?: boolean;
+              platform?: 'gemini' | 'aistudio';
+              accountScope?: unknown;
+            };
+            const platform = rawPlatform || 'gemini';
+            const accountScope = await resolveAccountScopeForMessage(
+              sender,
+              platform,
+              isSyncAccountScope(rawScope) ? rawScope : undefined,
+            );
+            const starredDataRaw =
+              platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
+            const forksDataRaw =
+              platform !== 'aistudio' ? await forkNodesManager.getAllForkNodes() : null;
+            const starredData =
+              starredDataRaw && accountScope
+                ? filterStarredByRouteScope(starredDataRaw, accountScope.routeUserId)
+                : starredDataRaw;
+            const forksData =
+              forksDataRaw && accountScope
+                ? filterForkNodesByRouteScope(forksDataRaw, accountScope.routeUserId)
+                : forksDataRaw;
+            const success = await localFolderSyncService.upload(
+              folders,
+              prompts,
+              starredData,
+              interactive !== false,
+              platform,
+              forksData,
+              accountScope,
+            );
+            sendResponse({ ok: success, state: await localFolderSyncService.getState() });
+            return;
+          }
+          case 'gv.sync.localDownload': {
+            const interactive = message.payload?.interactive !== false;
+            const platform = (message.payload?.platform as 'gemini' | 'aistudio') || 'gemini';
+            const rawScope = message.payload?.accountScope;
+            const accountScope = await resolveAccountScopeForMessage(
+              sender,
+              platform,
+              isSyncAccountScope(rawScope) ? rawScope : undefined,
+            );
+            const data = await localFolderSyncService.download(interactive, platform, accountScope);
+            sendResponse({
+              ok: true,
+              data,
+              state: await localFolderSyncService.getState(),
+            });
+            return;
+          }
+          case 'gv.sync.localGetState': {
+            sendResponse({ ok: true, state: await localFolderSyncService.getState() });
+            return;
+          }
+          case 'gv.sync.localPickerComplete': {
+            sendResponse({ ok: true });
             return;
           }
         }
