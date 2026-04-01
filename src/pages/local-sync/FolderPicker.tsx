@@ -2,6 +2,7 @@
 // to select a directory, persists the handle in IndexedDB, and signals completion.
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { SyncStorageKeys } from '@/core/types/sync';
 import { loadHandle, saveHandle } from '@/core/utils/idb';
 
 /**
@@ -186,6 +187,8 @@ export default function FolderPicker() {
       });
 
       await saveHandle(handle);
+
+      await chrome.storage.local.set({ [SyncStorageKeys.FOLDER_NAME]: handle.name });
 
       chrome.runtime.sendMessage({ type: 'gv.sync.localPickerComplete' });
 
