@@ -408,9 +408,14 @@ export function CloudSyncSettings() {
       let accountScope = accountContext.accountScope;
       let folderStorageKey = accountContext.folderStorageKey;
 
+      // Read provider from storage (source of truth) to avoid stale closure
+      const providerResult = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+      const currentProvider: SyncProvider =
+        providerResult[SyncStorageKeys.PROVIDER] === 'local-folder' ? 'local-folder' : 'google-drive';
+
       // Download from selected provider (platform-specific)
       const downloadType =
-        selectedProvider === 'local-folder' ? 'gv.sync.localDownload' : 'gv.sync.download';
+        currentProvider === 'local-folder' ? 'gv.sync.localDownload' : 'gv.sync.download';
       const response = (await chrome.runtime.sendMessage({
         type: downloadType,
         payload: { platform, accountScope },
@@ -589,7 +594,7 @@ export function CloudSyncSettings() {
     } finally {
       setIsDownloading(false);
     }
-  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, selectedProvider, t]);
+  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, t]);
 
   // Clear status message after 3 seconds
   useEffect(() => {
@@ -661,7 +666,7 @@ export function CloudSyncSettings() {
                       ? 'text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
-                  onClick={() => saveProvider('google-drive')}
+                  onClick={() => void saveProvider('google-drive')}
                 >
                   ☁️ {t('syncProviderGoogleDrive')}
                 </button>
@@ -674,7 +679,7 @@ export function CloudSyncSettings() {
                         : 'text-muted-foreground cursor-not-allowed opacity-50'
                   }`}
                   disabled={!isLocalFolderSupported}
-                  onClick={() => isLocalFolderSupported && void saveProvider('local-folder')}
+                  onClick={() => void saveProvider('local-folder')}
                 >
                   📁 {t('syncProviderLocalFolder')}
                   {!isLocalFolderSupported && (
