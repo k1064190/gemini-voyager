@@ -64,3 +64,4 @@ src/pages/content/printBridge/
 
 gemini-voyager-formal/
 .gstack/
+.worktrees/
