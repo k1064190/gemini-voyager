@@ -21,6 +21,8 @@ import { DEFAULT_SYNC_STATE, SyncStorageKeys } from '@/core/types/sync';
 import { isSafari } from '@/core/utils/browser';
 import type { StarredMessagesData } from '@/pages/content/timeline/starredTypes';
 
+import { loadHandle } from '@/core/utils/idb';
+
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardTitle } from '../../../components/ui/card';
 import { Label } from '../../../components/ui/label';
@@ -282,7 +284,9 @@ export function CloudSyncSettings() {
   const isLocalFolderSupported = LocalFolderSyncService.isSupported();
 
   // Handle sync now (upload current data)
-  const handleSyncNow = useCallback(async () => {
+  // providerOverride: use this provider instead of the selectedProvider state, to avoid
+  // stale closure issues when called immediately after a provider change.
+  const handleSyncNow = useCallback(async (providerOverride?: SyncProvider) => {
     setStatusMessage(null);
     setIsUploading(true);
 
@@ -353,9 +357,11 @@ export function CloudSyncSettings() {
         platform === 'gemini' ? `prompts: ${prompts.length}` : '(prompts skipped for AI Studio)',
       );
 
-      // Upload to selected provider with platform info
+      // Upload to selected provider with platform info.
+      // Use providerOverride when provided to avoid stale closure on the selectedProvider state.
+      const effectiveProvider = providerOverride ?? selectedProvider;
       const uploadType =
-        selectedProvider === 'local-folder' ? 'gv.sync.localUpload' : 'gv.sync.upload';
+        effectiveProvider === 'local-folder' ? 'gv.sync.localUpload' : 'gv.sync.upload';
       const response = (await chrome.runtime.sendMessage({
         type: uploadType,
         payload: { folders, prompts, platform, accountScope },
@@ -383,9 +389,17 @@ export function CloudSyncSettings() {
     async (provider: SyncProvider) => {
       await saveProvider(provider);
       if (provider === 'google-drive') {
-        handleSyncNow();
+        handleSyncNow(provider);
       } else {
-        chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/local-sync/index.html') });
+        // If a folder handle is already stored, upload immediately.
+        // Only open the picker when no folder has been selected yet.
+        // Pass provider explicitly to avoid stale selectedProvider closure.
+        const handle = await loadHandle();
+        if (handle) {
+          handleSyncNow(provider);
+        } else {
+          chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/local-sync/index.html') });
+        }
       }
     },
     [handleSyncNow, saveProvider],

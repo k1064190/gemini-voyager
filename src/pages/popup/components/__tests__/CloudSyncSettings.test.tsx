@@ -1,7 +1,9 @@
 import React, { act } from 'react';
 import { type Root, createRoot } from 'react-dom/client';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
+
+import * as idb from '@/core/utils/idb';
 
 import type { SyncState } from '@/core/types/sync';
 import { DEFAULT_SYNC_STATE } from '@/core/types/sync';
@@ -24,6 +26,10 @@ vi.mock('@/core/services/LocalFolderSyncService', () => ({
   LocalFolderSyncService: {
     isSupported: () => true,
   },
+}));
+
+vi.mock('@/core/utils/idb', () => ({
+  loadHandle: vi.fn().mockResolvedValue(null),
 }));
 
 type MockedChrome = typeof chrome;
@@ -321,6 +327,75 @@ describe('CloudSyncSettings provider routing', () => {
     expect(sendMessageMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gv.sync.download' }),
     );
+  });
+
+  it('sends gv.sync.localUpload when Local Folder selected and folder handle exists', async () => {
+    // Simulate a stored folder handle already in IDB
+    (idb.loadHandle as MockedFunction<typeof idb.loadHandle>).mockResolvedValueOnce(
+      {} as FileSystemDirectoryHandle,
+    );
+
+    const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
+      if (message.type === 'gv.sync.getState') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      if (message.type === 'gv.sync.localUpload') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    const tabsCreateMock = vi.fn().mockResolvedValue({ id: 99 });
+    const runtimeGetURLMock = vi.fn().mockReturnValue('chrome-extension://abc/src/pages/local-sync/index.html');
+
+    const chromeMock = {
+      ...createChromeMock(sendMessageMock),
+      tabs: {
+        query: vi.fn().mockResolvedValue([{ id: 1, url: 'https://gemini.google.com/app' }]),
+        sendMessage: vi.fn().mockResolvedValue({ ok: true, data: { folders: [], folderContents: {} } }),
+        create: tabsCreateMock,
+      },
+      runtime: {
+        sendMessage: sendMessageMock,
+        lastError: null,
+        id: 'test-extension-id',
+        getURL: runtimeGetURLMock,
+      },
+    } as unknown as MockedChrome;
+
+    (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CloudSyncSettings />);
+    });
+    await flushMicrotasks();
+
+    // Click Upload to open provider picker
+    const uploadButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncUpload'),
+    );
+    await act(async () => {
+      uploadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    // Click Local Folder
+    const localFolderButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('Local Folder'),
+    );
+    expect(localFolderButton).toBeTruthy();
+
+    await act(async () => {
+      localFolderButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    // Should upload, not open picker
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gv.sync.localUpload' }),
+    );
+    expect(tabsCreateMock).not.toHaveBeenCalled();
   });
 
   it('opens folder picker tab when Local Folder is selected from provider picker', async () => {
