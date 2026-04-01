@@ -963,6 +963,10 @@
     "message": "متصل بالمجلد",
     "description": "رسالة الحالة عند اتصال مجلد محلي"
   },
+  "syncFolderConnected": {
+    "message": "متصل: {name}",
+    "description": "رسالة الحالة تعرض اسم مجلد محلي متصل"
+  },
   "syncLocalFolderNotConnected": {
     "message": "لم يتم تحديد مجلد",
     "description": "رسالة الحالة عند عدم تحديد مجلد محلي"

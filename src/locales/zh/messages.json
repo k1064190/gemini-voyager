@@ -963,6 +963,10 @@
     "message": "已连接文件夹",
     "description": "本地文件夹已连接时的状态消息"
   },
+  "syncFolderConnected": {
+    "message": "已连接: {name}",
+    "description": "显示已连接的本地文件夹名称的状态消息"
+  },
   "syncLocalFolderNotConnected": {
     "message": "未选择文件夹",
     "description": "未选择本地文件夹时的状态消息"

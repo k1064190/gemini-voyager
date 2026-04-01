@@ -963,6 +963,10 @@
     "message": "Carpeta conectada",
     "description": "Mensaje de estado cuando una carpeta local está conectada"
   },
+  "syncFolderConnected": {
+    "message": "Conectado: {name}",
+    "description": "Mensaje de estado que muestra el nombre de la carpeta local conectada"
+  },
   "syncLocalFolderNotConnected": {
     "message": "Ninguna carpeta seleccionada",
     "description": "Mensaje de estado cuando no se ha seleccionado una carpeta local"

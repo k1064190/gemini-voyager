@@ -963,6 +963,10 @@
     "message": "Dossier connecté",
     "description": "Message d'état lorsqu'un dossier local est connecté"
   },
+  "syncFolderConnected": {
+    "message": "Connecté : {name}",
+    "description": "Message d'état affichant le nom du dossier local connecté"
+  },
   "syncLocalFolderNotConnected": {
     "message": "Aucun dossier sélectionné",
     "description": "Message d'état lorsqu'aucun dossier local n'est sélectionné"

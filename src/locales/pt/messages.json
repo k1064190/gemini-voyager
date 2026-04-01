@@ -963,6 +963,10 @@
     "message": "Pasta conectada",
     "description": "Mensagem de status quando uma pasta local está conectada"
   },
+  "syncFolderConnected": {
+    "message": "Conectado: {name}",
+    "description": "Mensagem de status mostrando o nome da pasta local conectada"
+  },
   "syncLocalFolderNotConnected": {
     "message": "Nenhuma pasta selecionada",
     "description": "Mensagem de status quando nenhuma pasta local está selecionada"

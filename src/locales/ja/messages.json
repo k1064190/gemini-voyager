@@ -963,6 +963,10 @@
     "message": "フォルダに接続済み",
     "description": "ローカルフォルダが接続されている時のステータスメッセージ"
   },
+  "syncFolderConnected": {
+    "message": "接続済み: {name}",
+    "description": "接続されたローカルフォルダ名を表示するステータスメッセージ"
+  },
   "syncLocalFolderNotConnected": {
     "message": "フォルダが選択されていません",
     "description": "ローカルフォルダが選択されていない時のステータスメッセージ"

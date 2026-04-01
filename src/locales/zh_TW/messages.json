@@ -923,6 +923,10 @@
     "message": "已連接資料夾",
     "description": "本機資料夾已連接時的狀態訊息"
   },
+  "syncFolderConnected": {
+    "message": "已連接: {name}",
+    "description": "顯示已連接的本機資料夾名稱的狀態訊息"
+  },
   "syncLocalFolderNotConnected": {
     "message": "未選擇資料夾",
     "description": "未選擇本機資料夾時的狀態訊息"

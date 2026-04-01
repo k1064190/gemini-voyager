@@ -963,6 +963,10 @@
     "message": "폴더에 연결됨",
     "description": "로컬 폴더가 연결되었을 때의 상태 메시지"
   },
+  "syncFolderConnected": {
+    "message": "연결됨: {name}",
+    "description": "연결된 로컬 폴더 이름을 표시하는 상태 메시지"
+  },
   "syncLocalFolderNotConnected": {
     "message": "선택된 폴더 없음",
     "description": "로컬 폴더가 선택되지 않았을 때의 상태 메시지"
