@@ -23,6 +23,11 @@ export default mergeConfig(
     build: {
       ...baseBuildOptions,
       outDir,
+      rollupOptions: {
+        input: {
+          'local-sync': resolve(__dirname, 'src/pages/local-sync/index.html'),
+        },
+      },
     },
   }),
 );

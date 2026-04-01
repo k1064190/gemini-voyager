@@ -353,9 +353,11 @@ export function CloudSyncSettings() {
         platform === 'gemini' ? `prompts: ${prompts.length}` : '(prompts skipped for AI Studio)',
       );
 
-      // Upload to Google Drive with platform info
+      // Upload to selected provider with platform info
+      const uploadType =
+        selectedProvider === 'local-folder' ? 'gv.sync.localUpload' : 'gv.sync.upload';
       const response = (await chrome.runtime.sendMessage({
-        type: 'gv.sync.upload',
+        type: uploadType,
         payload: { folders, prompts, platform, accountScope },
       })) as { ok?: boolean; error?: string; state?: SyncState } | undefined;
 
@@ -375,7 +377,7 @@ export function CloudSyncSettings() {
     } finally {
       setIsUploading(false);
     }
-  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, t]);
+  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, selectedProvider, t]);
 
   const handleProviderSelect = useCallback(
     async (provider: SyncProvider) => {
@@ -399,9 +401,11 @@ export function CloudSyncSettings() {
       let accountScope = accountContext.accountScope;
       let folderStorageKey = accountContext.folderStorageKey;
 
-      // Download from Google Drive (platform-specific)
+      // Download from selected provider (platform-specific)
+      const downloadType =
+        selectedProvider === 'local-folder' ? 'gv.sync.localDownload' : 'gv.sync.download';
       const response = (await chrome.runtime.sendMessage({
-        type: 'gv.sync.download',
+        type: downloadType,
         payload: { platform, accountScope },
       })) as
         | {
@@ -578,7 +582,7 @@ export function CloudSyncSettings() {
     } finally {
       setIsDownloading(false);
     }
-  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, t]);
+  }, [getBaseFolderStorageKey, platform, resolveAccountSyncContext, selectedProvider, t]);
 
   // Clear status message after 3 seconds
   useEffect(() => {

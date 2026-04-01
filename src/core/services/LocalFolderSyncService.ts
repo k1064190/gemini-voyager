@@ -21,6 +21,7 @@ import type {
 } from '@/core/types/sync';
 import { DEFAULT_SYNC_STATE, SyncStorageKeys } from '@/core/types/sync';
 import { loadHandle, removeHandle, saveHandle } from '@/core/utils/idb';
+import { hashString } from '@/core/utils/hash';
 
 function getStringValue(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
@@ -72,7 +73,7 @@ export class LocalFolderSyncService {
   }
 
   static isSupported(): boolean {
-    return 'showDirectoryPicker' in window;
+    return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
   }
 
   async upload(
@@ -82,7 +83,7 @@ export class LocalFolderSyncService {
     _interactive: boolean,
     platform: SyncPlatform,
     forks: ForkNodesDataSync | null,
-    _accountScope: SyncAccountScope | null,
+    accountScope: SyncAccountScope | null,
   ): Promise<boolean> {
     const handle = await this.getHandle();
     if (!handle) {
@@ -108,7 +109,7 @@ export class LocalFolderSyncService {
         version: VERSION,
         data: folders,
       };
-      await this.writeJsonFile(handle, FILE_NAMES.folders, folderPayload);
+      await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.folders, accountScope), folderPayload);
 
       const promptPayload: PromptExportPayload = {
         format: 'gemini-voyager.prompts.v1',
@@ -116,7 +117,7 @@ export class LocalFolderSyncService {
         version: VERSION,
         items: prompts,
       };
-      await this.writeJsonFile(handle, FILE_NAMES.prompts, promptPayload);
+      await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.prompts, accountScope), promptPayload);
 
       if (starred) {
         const starredPayload: StarredExportPayload = {
@@ -125,7 +126,7 @@ export class LocalFolderSyncService {
           version: VERSION,
           data: starred,
         };
-        await this.writeJsonFile(handle, FILE_NAMES.starred, starredPayload);
+        await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.starred, accountScope), starredPayload);
       }
 
       if (forks) {
@@ -135,7 +136,7 @@ export class LocalFolderSyncService {
           version: VERSION,
           data: forks,
         };
-        await this.writeJsonFile(handle, FILE_NAMES.forks, forkPayload);
+        await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.forks, accountScope), forkPayload);
       }
 
       const timestamp = Date.now();
@@ -162,7 +163,7 @@ export class LocalFolderSyncService {
   async download(
     _interactive: boolean,
     _platform: SyncPlatform,
-    _accountScope: SyncAccountScope | null,
+    accountScope: SyncAccountScope | null,
   ): Promise<{
     folders: FolderExportPayload | null;
     prompts: PromptExportPayload | null;
@@ -181,10 +182,10 @@ export class LocalFolderSyncService {
     }
 
     try {
-      const folders = await this.readJsonFile<FolderExportPayload>(handle, FILE_NAMES.folders);
-      const prompts = await this.readJsonFile<PromptExportPayload>(handle, FILE_NAMES.prompts);
-      const starred = await this.readJsonFile<StarredExportPayload>(handle, FILE_NAMES.starred);
-      const forks = await this.readJsonFile<ForkExportPayload>(handle, FILE_NAMES.forks);
+      const folders = await this.readJsonFile<FolderExportPayload>(handle, this.getFileName(FILE_NAMES.folders, accountScope));
+      const prompts = await this.readJsonFile<PromptExportPayload>(handle, this.getFileName(FILE_NAMES.prompts, accountScope));
+      const starred = await this.readJsonFile<StarredExportPayload>(handle, this.getFileName(FILE_NAMES.starred, accountScope));
+      const forks = await this.readJsonFile<ForkExportPayload>(handle, this.getFileName(FILE_NAMES.forks, accountScope));
 
       this.updateState({ lastSyncTime: Date.now(), error: null });
       await this.saveState();
@@ -200,6 +201,16 @@ export class LocalFolderSyncService {
       this.updateState({ error: message });
       return null;
     }
+  }
+
+  /**
+   * Returns a scoped file name for multi-account isolation.
+   * Appends `-acct-{hash}` before `.json` when an accountScope is provided.
+   */
+  private getFileName(baseName: string, accountScope: SyncAccountScope | null): string {
+    if (!accountScope) return baseName;
+    const suffix = `acct-${hashString(accountScope.accountKey)}`;
+    return baseName.replace('.json', `-${suffix}.json`);
   }
 
   private getErrorMessage(err: DOMException): string {
