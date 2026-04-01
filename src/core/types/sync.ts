@@ -148,6 +148,7 @@ export const SyncStorageKeys = {
   LAST_SYNC_TIME: 'gvLastSyncTime',
   SYNC_ERROR: 'gvSyncError',
   PROVIDER: 'gvSyncProvider',
+  FOLDER_NAME: 'gvSyncFolderName',
 } as const;
 
 /**
