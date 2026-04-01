@@ -943,6 +943,54 @@
     "message": "Échec auth.",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "Destination de synchronisation",
+    "description": "Titre du sélecteur de fournisseur de synchronisation"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "Libellé de l'option Google Drive dans le sélecteur de fournisseur"
+  },
+  "syncProviderLocalFolder": {
+    "message": "Dossier local",
+    "description": "Libellé de l'option Dossier local dans le sélecteur de fournisseur"
+  },
+  "syncLocalFolderSelect": {
+    "message": "Sélectionner un dossier",
+    "description": "Libellé du bouton pour ouvrir le sélecteur de dossier pour la synchronisation locale"
+  },
+  "syncLocalFolderConnected": {
+    "message": "Dossier connecté",
+    "description": "Message d'état lorsqu'un dossier local est connecté"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "Aucun dossier sélectionné",
+    "description": "Message d'état lorsqu'aucun dossier local n'est sélectionné"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "Autorisation refusée. Veuillez accorder l'accès au dossier.",
+    "description": "Erreur lorsque l'autorisation d'accès au dossier est refusée"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "Le dossier sélectionné n'est plus disponible. Veuillez sélectionner un nouveau dossier.",
+    "description": "Erreur lorsque le dossier sélectionné n'est plus accessible"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "La synchronisation de dossier local n'est pas prise en charge par ce navigateur. Utilisez Chrome ou Edge.",
+    "description": "Erreur lorsque le navigateur ne prend pas en charge l'API d'accès au système de fichiers"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "Accorder l'accès",
+    "description": "Libellé du bouton pour accorder l'autorisation d'accès au dossier"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "Changer de dossier",
+    "description": "Libellé du bouton pour changer le dossier local synchronisé"
+  },
+  "syncProviderUnsupported": {
+    "message": "Non pris en charge",
+    "description": "Badge affiché lorsque le fournisseur de synchronisation n'est pas pris en charge par le navigateur actuel"
+  },
   "signOut": {
     "message": "Déconnexion",
     "description": "Sign out button"

@@ -943,6 +943,54 @@
     "message": "Ошибка аутентификации",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "Место синхронизации",
+    "description": "Заголовок выбора провайдера синхронизации"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "Метка опции Google Drive в выборе провайдера синхронизации"
+  },
+  "syncProviderLocalFolder": {
+    "message": "Локальная папка",
+    "description": "Метка опции «Локальная папка» в выборе провайдера синхронизации"
+  },
+  "syncLocalFolderSelect": {
+    "message": "Выбрать папку",
+    "description": "Метка кнопки для открытия диалога выбора папки для локальной синхронизации"
+  },
+  "syncLocalFolderConnected": {
+    "message": "Папка подключена",
+    "description": "Сообщение о состоянии при подключении локальной папки"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "Папка не выбрана",
+    "description": "Сообщение о состоянии, когда локальная папка не выбрана"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "Доступ запрещён. Предоставьте доступ к папке.",
+    "description": "Ошибка при отказе в доступе к папке"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "Выбранная папка больше недоступна. Выберите новую папку.",
+    "description": "Ошибка, когда выбранная папка больше недоступна"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "Синхронизация с локальной папкой не поддерживается в этом браузере. Используйте Chrome или Edge.",
+    "description": "Ошибка, когда браузер не поддерживает File System Access API"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "Предоставить доступ",
+    "description": "Метка кнопки для предоставления разрешения на доступ к папке"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "Сменить папку",
+    "description": "Метка кнопки для изменения синхронизируемой локальной папки"
+  },
+  "syncProviderUnsupported": {
+    "message": "Не поддерживается",
+    "description": "Значок, отображаемый, когда провайдер синхронизации не поддерживается текущим браузером"
+  },
   "signOut": {
     "message": "Выйти",
     "description": "Sign out button"

@@ -903,6 +903,54 @@
     "message": "認證失敗",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "同步目標",
+    "description": "同步提供者選擇器的標題"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "同步提供者選擇器中的 Google Drive 選項標籤"
+  },
+  "syncProviderLocalFolder": {
+    "message": "本機資料夾",
+    "description": "同步提供者選擇器中的本機資料夾選項標籤"
+  },
+  "syncLocalFolderSelect": {
+    "message": "選擇資料夾",
+    "description": "開啟資料夾選擇器以進行本機同步的按鈕標籤"
+  },
+  "syncLocalFolderConnected": {
+    "message": "已連接資料夾",
+    "description": "本機資料夾已連接時的狀態訊息"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "未選擇資料夾",
+    "description": "未選擇本機資料夾時的狀態訊息"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "權限被拒絕。請授予資料夾存取權限。",
+    "description": "資料夾存取權限被拒絕時的錯誤提示"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "所選資料夾已無法使用。請選擇新資料夾。",
+    "description": "所選資料夾無法存取時的錯誤提示"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "此瀏覽器不支援本機資料夾同步。請使用 Chrome 或 Edge。",
+    "description": "瀏覽器不支援檔案系統存取 API 時的錯誤提示"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "授予存取權限",
+    "description": "授予資料夾存取權限的按鈕標籤"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "變更資料夾",
+    "description": "變更同步的本機資料夾的按鈕標籤"
+  },
+  "syncProviderUnsupported": {
+    "message": "不支援",
+    "description": "目前瀏覽器不支援該同步提供者時顯示的標記"
+  },
   "signOut": {
     "message": "登出",
     "description": "登出按鈕"

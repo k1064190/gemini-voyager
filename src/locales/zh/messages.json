@@ -943,6 +943,54 @@
     "message": "认证失败",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "同步目标",
+    "description": "同步提供方选择器的标题"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "同步提供方选择器中的 Google Drive 选项标签"
+  },
+  "syncProviderLocalFolder": {
+    "message": "本地文件夹",
+    "description": "同步提供方选择器中的本地文件夹选项标签"
+  },
+  "syncLocalFolderSelect": {
+    "message": "选择文件夹",
+    "description": "打开文件夹选择器以进行本地同步的按钮标签"
+  },
+  "syncLocalFolderConnected": {
+    "message": "已连接文件夹",
+    "description": "本地文件夹已连接时的状态消息"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "未选择文件夹",
+    "description": "未选择本地文件夹时的状态消息"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "权限被拒绝。请授予文件夹访问权限。",
+    "description": "文件夹访问权限被拒绝时的错误提示"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "所选文件夹已不可用。请选择新文件夹。",
+    "description": "所选文件夹无法访问时的错误提示"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "此浏览器不支持本地文件夹同步。请使用 Chrome 或 Edge。",
+    "description": "浏览器不支持文件系统访问 API 时的错误提示"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "授予访问权限",
+    "description": "授予文件夹访问权限的按钮标签"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "更改文件夹",
+    "description": "更改同步的本地文件夹的按钮标签"
+  },
+  "syncProviderUnsupported": {
+    "message": "不支持",
+    "description": "当前浏览器不支持该同步提供方时显示的标记"
+  },
   "signOut": {
     "message": "退出登录",
     "description": "退出登录按钮"

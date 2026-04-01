@@ -943,6 +943,54 @@
     "message": "Falha na autenticação",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "Destino da sincronização",
+    "description": "Título do seletor de provedor de sincronização"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "Rótulo da opção Google Drive no seletor de provedor"
+  },
+  "syncProviderLocalFolder": {
+    "message": "Pasta local",
+    "description": "Rótulo da opção Pasta local no seletor de provedor"
+  },
+  "syncLocalFolderSelect": {
+    "message": "Selecionar pasta",
+    "description": "Rótulo do botão para abrir o seletor de pastas para sincronização local"
+  },
+  "syncLocalFolderConnected": {
+    "message": "Pasta conectada",
+    "description": "Mensagem de status quando uma pasta local está conectada"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "Nenhuma pasta selecionada",
+    "description": "Mensagem de status quando nenhuma pasta local está selecionada"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "Permissão negada. Conceda acesso à pasta.",
+    "description": "Erro quando a permissão de acesso à pasta é negada"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "A pasta selecionada não está mais disponível. Selecione uma nova pasta.",
+    "description": "Erro quando a pasta selecionada não está mais acessível"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "A sincronização de pasta local não é compatível com este navegador. Use Chrome ou Edge.",
+    "description": "Erro quando o navegador não é compatível com a API de acesso ao sistema de arquivos"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "Conceder acesso",
+    "description": "Rótulo do botão para conceder permissão de acesso à pasta"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "Alterar pasta",
+    "description": "Rótulo do botão para alterar a pasta local sincronizada"
+  },
+  "syncProviderUnsupported": {
+    "message": "Incompatível",
+    "description": "Distintivo exibido quando o provedor de sincronização não é compatível com o navegador atual"
+  },
   "signOut": {
     "message": "Sair",
     "description": "Sign out button"

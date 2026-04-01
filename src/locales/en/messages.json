@@ -943,6 +943,54 @@
     "message": "Authentication failed",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "Sync Destination",
+    "description": "Title for the sync provider picker"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "Google Drive option label in sync provider picker"
+  },
+  "syncProviderLocalFolder": {
+    "message": "Local Folder",
+    "description": "Local Folder option label in sync provider picker"
+  },
+  "syncLocalFolderSelect": {
+    "message": "Select Folder",
+    "description": "Button label to open folder picker for local sync"
+  },
+  "syncLocalFolderConnected": {
+    "message": "Connected to folder",
+    "description": "Status message when a local folder is connected"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "No folder selected",
+    "description": "Status message when no local folder is selected"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "Permission denied. Please grant access to the folder.",
+    "description": "Error when folder access permission is denied"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "The selected folder is no longer available. Please select a new folder.",
+    "description": "Error when the selected folder is no longer accessible"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "Local folder sync is not supported in this browser. Use Chrome or Edge.",
+    "description": "Error when browser does not support File System Access API"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "Grant Access",
+    "description": "Button label to grant folder access permission"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "Change Folder",
+    "description": "Button label to change the synced local folder"
+  },
+  "syncProviderUnsupported": {
+    "message": "Unsupported",
+    "description": "Badge shown when sync provider is not supported in the current browser"
+  },
   "signOut": {
     "message": "Sign out",
     "description": "Sign out button"

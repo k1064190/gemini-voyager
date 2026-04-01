@@ -943,6 +943,54 @@
     "message": "認証に失敗しました",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "同期先",
+    "description": "同期プロバイダー選択のタイトル"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "同期プロバイダー選択のGoogle Driveオプションラベル"
+  },
+  "syncProviderLocalFolder": {
+    "message": "ローカルフォルダ",
+    "description": "同期プロバイダー選択のローカルフォルダオプションラベル"
+  },
+  "syncLocalFolderSelect": {
+    "message": "フォルダを選択",
+    "description": "ローカル同期のフォルダ選択ダイアログを開くボタンのラベル"
+  },
+  "syncLocalFolderConnected": {
+    "message": "フォルダに接続済み",
+    "description": "ローカルフォルダが接続されている時のステータスメッセージ"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "フォルダが選択されていません",
+    "description": "ローカルフォルダが選択されていない時のステータスメッセージ"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "アクセス許可が拒否されました。フォルダへのアクセスを許可してください。",
+    "description": "フォルダへのアクセス許可が拒否された場合のエラー"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "選択したフォルダは使用できなくなりました。新しいフォルダを選択してください。",
+    "description": "選択したフォルダにアクセスできなくなった場合のエラー"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "このブラウザではローカルフォルダ同期に対応していません。ChromeまたはEdgeをご使用ください。",
+    "description": "ブラウザがFile System Access APIに対応していない場合のエラー"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "アクセスを許可",
+    "description": "フォルダへのアクセス許可を付与するボタンのラベル"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "フォルダを変更",
+    "description": "同期先のローカルフォルダを変更するボタンのラベル"
+  },
+  "syncProviderUnsupported": {
+    "message": "未対応",
+    "description": "現在のブラウザで同期プロバイダーがサポートされていない場合に表示されるバッジ"
+  },
   "signOut": {
     "message": "サインアウト",
     "description": "Sign out button"
