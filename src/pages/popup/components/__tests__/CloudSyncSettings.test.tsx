@@ -486,3 +486,188 @@ describe('CloudSyncSettings provider routing', () => {
     );
   });
 });
+
+describe('CloudSyncSettings pill toggle and folder info strip', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => {
+        root.unmount();
+      });
+    }
+    document.body.innerHTML = '';
+    vi.clearAllMocks();
+  });
+
+  it('shows both provider pill buttons and no folder info strip when Drive is selected by default', async () => {
+    const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
+      if (message.type === 'gv.sync.getState') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    (globalThis as { chrome: MockedChrome }).chrome = createChromeMock(sendMessageMock);
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CloudSyncSettings />);
+    });
+    await flushMicrotasks();
+
+    const drivePill = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncProviderGoogleDrive'),
+    );
+    expect(drivePill).toBeTruthy();
+
+    const localPill = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncProviderLocalFolder'),
+    );
+    expect(localPill).toBeTruthy();
+
+    // Folder info strip should NOT be visible when Drive is selected
+    const notConnectedText = container.textContent || '';
+    expect(notConnectedText).not.toContain('syncLocalFolderNotConnected');
+    expect(notConnectedText).not.toContain('syncFolderConnected');
+  });
+
+  it('shows "not connected" strip when local-folder selected but no folder name in storage', async () => {
+    const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
+      if (message.type === 'gv.sync.getState') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    const chromeMock = {
+      ...createChromeMock(sendMessageMock),
+      storage: {
+        ...createChromeMock(sendMessageMock).storage,
+        local: {
+          get: vi.fn().mockResolvedValue({
+            gvFolderData: { folders: [], folderContents: {} },
+            gvPromptItems: [],
+            geminiTimelineStarredMessages: { messages: {} },
+            gvSyncProvider: 'local-folder',
+            gvSyncFolderName: null,
+          }),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as MockedChrome;
+
+    (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CloudSyncSettings />);
+    });
+    await flushMicrotasks();
+
+    expect(container.textContent).toContain('syncLocalFolderNotConnected');
+
+    const selectButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncLocalFolderSelect'),
+    );
+    expect(selectButton).toBeTruthy();
+  });
+
+  it('shows connected folder name when both provider and folder name are in storage', async () => {
+    const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
+      if (message.type === 'gv.sync.getState') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    const chromeMock = {
+      ...createChromeMock(sendMessageMock),
+      storage: {
+        ...createChromeMock(sendMessageMock).storage,
+        local: {
+          get: vi.fn().mockResolvedValue({
+            gvFolderData: { folders: [], folderContents: {} },
+            gvPromptItems: [],
+            geminiTimelineStarredMessages: { messages: {} },
+            gvSyncProvider: 'local-folder',
+            gvSyncFolderName: 'MyDocuments',
+          }),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as MockedChrome;
+
+    (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CloudSyncSettings />);
+    });
+    await flushMicrotasks();
+
+    // t('syncFolderConnected') returns the key; replace('{name}', name) leaves it as-is
+    // since the key itself does not contain '{name}'. The DOM text includes the key.
+    expect(container.textContent).toContain('syncFolderConnected');
+
+    const changeFolderButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncLocalFolderChangeFolder'),
+    );
+    expect(changeFolderButton).toBeTruthy();
+  });
+
+  it('saves local-folder provider to storage when Local pill is clicked', async () => {
+    const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
+      if (message.type === 'gv.sync.getState') {
+        return Promise.resolve({ ok: true, state: baseState });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    const setMock = vi.fn().mockResolvedValue(undefined);
+    const chromeMock = {
+      ...createChromeMock(sendMessageMock),
+      storage: {
+        ...createChromeMock(sendMessageMock).storage,
+        local: {
+          get: vi.fn().mockResolvedValue({
+            gvFolderData: { folders: [], folderContents: {} },
+            gvPromptItems: [],
+            geminiTimelineStarredMessages: { messages: {} },
+          }),
+          set: setMock,
+          remove: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    } as unknown as MockedChrome;
+
+    (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
+
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<CloudSyncSettings />);
+    });
+    await flushMicrotasks();
+
+    const localPill = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncProviderLocalFolder'),
+    );
+    expect(localPill).toBeTruthy();
+
+    await act(async () => {
+      localPill?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await flushMicrotasks();
+
+    expect(setMock).toHaveBeenCalledWith({ gvSyncProvider: 'local-folder' });
+  });
+});
