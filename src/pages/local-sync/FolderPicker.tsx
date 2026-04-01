@@ -163,7 +163,6 @@ export default function FolderPicker() {
 
   const handleSelectFolder = useCallback(async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- showDirectoryPicker not in all TS lib configs
       const picker = (window as unknown as Record<string, unknown>).showDirectoryPicker as
         | ((options: {
             mode: string;
