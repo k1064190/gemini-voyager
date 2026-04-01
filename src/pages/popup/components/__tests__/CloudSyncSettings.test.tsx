@@ -104,7 +104,7 @@ describe('CloudSyncSettings auth flow', () => {
     document.body.appendChild(container);
   });
 
-  it('triggers upload after selecting Google Drive from provider picker', async () => {
+  it('triggers upload after clicking upload with Google Drive provider selected (default)', async () => {
     const sendMessageMock = vi.fn().mockImplementation((message: { type?: string }) => {
       if (message.type === 'gv.sync.getState') {
         return Promise.resolve({ ok: true, state: baseState });
@@ -126,6 +126,14 @@ describe('CloudSyncSettings auth flow', () => {
     });
     await flushMicrotasks();
 
+    // Google Drive is the default provider — the persistent pill toggle is always shown.
+    // Verify the toggle is rendered.
+    const googleDriveButton = Array.from(container.querySelectorAll('button')).find((btn) =>
+      (btn.textContent || '').includes('syncProviderGoogleDrive'),
+    );
+    expect(googleDriveButton).toBeTruthy();
+
+    // Click Upload directly (no picker involved with the new pill toggle UI).
     const uploadButton = Array.from(container.querySelectorAll('button')).find((btn) =>
       (btn.textContent || '').includes('syncUpload'),
     );
@@ -133,16 +141,6 @@ describe('CloudSyncSettings auth flow', () => {
 
     await act(async () => {
       uploadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await flushMicrotasks();
-
-    const googleDriveButton = Array.from(container.querySelectorAll('button')).find((btn) =>
-      (btn.textContent || '').includes('Google Drive'),
-    );
-    expect(googleDriveButton).toBeTruthy();
-
-    await act(async () => {
-      googleDriveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await flushMicrotasks();
 
@@ -361,6 +359,29 @@ describe('CloudSyncSettings provider routing', () => {
         id: 'test-extension-id',
         getURL: runtimeGetURLMock,
       },
+      storage: {
+        local: {
+          // Return local-folder as provider so handleSyncNow reads it from storage
+          get: vi.fn().mockResolvedValue({
+            gvFolderData: { folders: [], folderContents: {} },
+            gvPromptItems: [],
+            geminiTimelineStarredMessages: { messages: {} },
+            gvSyncProvider: 'local-folder',
+          }),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+        },
+        sync: {
+          get: vi.fn().mockResolvedValue({}),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+          clear: vi.fn().mockResolvedValue(undefined),
+        },
+        onChanged: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+      },
     } as unknown as MockedChrome;
 
     (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
@@ -371,23 +392,16 @@ describe('CloudSyncSettings provider routing', () => {
     });
     await flushMicrotasks();
 
-    // Click Upload to open provider picker
+    // With the new pill toggle UI, the Local Folder pill is always visible.
+    // The provider is already set to local-folder via storage mock.
+    // Click Upload to trigger localUpload (handle exists).
     const uploadButton = Array.from(container.querySelectorAll('button')).find((btn) =>
       (btn.textContent || '').includes('syncUpload'),
     );
+    expect(uploadButton).toBeTruthy();
+
     await act(async () => {
       uploadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await flushMicrotasks();
-
-    // Click Local Folder
-    const localFolderButton = Array.from(container.querySelectorAll('button')).find((btn) =>
-      (btn.textContent || '').includes('Local Folder'),
-    );
-    expect(localFolderButton).toBeTruthy();
-
-    await act(async () => {
-      localFolderButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await flushMicrotasks();
 
@@ -398,7 +412,10 @@ describe('CloudSyncSettings provider routing', () => {
     expect(tabsCreateMock).not.toHaveBeenCalled();
   });
 
-  it('opens folder picker tab when Local Folder is selected from provider picker', async () => {
+  it('opens folder picker tab when Upload is clicked with local-folder provider and no handle', async () => {
+    // loadHandle returns null — no folder handle stored
+    (idb.loadHandle as MockedFunction<typeof idb.loadHandle>).mockResolvedValueOnce(null);
+
     const sendMessageMock = vi.fn().mockResolvedValue({ ok: true, state: baseState });
     const tabsCreateMock = vi.fn().mockResolvedValue({ id: 99 });
     const runtimeGetURLMock = vi.fn().mockReturnValue('chrome-extension://abc/src/pages/local-sync/index.html');
@@ -416,6 +433,29 @@ describe('CloudSyncSettings provider routing', () => {
         id: 'test-extension-id',
         getURL: runtimeGetURLMock,
       },
+      storage: {
+        local: {
+          // Return local-folder as provider so handleSyncNow reads it from storage
+          get: vi.fn().mockResolvedValue({
+            gvFolderData: { folders: [], folderContents: {} },
+            gvPromptItems: [],
+            geminiTimelineStarredMessages: { messages: {} },
+            gvSyncProvider: 'local-folder',
+          }),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+        },
+        sync: {
+          get: vi.fn().mockResolvedValue({}),
+          set: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
+          clear: vi.fn().mockResolvedValue(undefined),
+        },
+        onChanged: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
+      },
     } as unknown as MockedChrome;
 
     (globalThis as { chrome: MockedChrome }).chrome = chromeMock;
@@ -426,30 +466,21 @@ describe('CloudSyncSettings provider routing', () => {
     });
     await flushMicrotasks();
 
-    // Click Upload to open provider picker
+    // Click Upload — provider is local-folder but no handle exists, so picker tab opens.
     const uploadButton = Array.from(container.querySelectorAll('button')).find((btn) =>
       (btn.textContent || '').includes('syncUpload'),
     );
+    expect(uploadButton).toBeTruthy();
+
     await act(async () => {
       uploadButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await flushMicrotasks();
-
-    // Click Local Folder
-    const localFolderButton = Array.from(container.querySelectorAll('button')).find((btn) =>
-      (btn.textContent || '').includes('Local Folder'),
-    );
-    expect(localFolderButton).toBeTruthy();
-
-    await act(async () => {
-      localFolderButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     await flushMicrotasks();
 
     expect(tabsCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({ url: expect.stringContaining('local-sync') }),
     );
-    // Local Folder selection must NOT trigger a sync upload message
+    // No upload message should be sent when redirecting to folder picker
     expect(sendMessageMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gv.sync.localUpload' }),
     );
