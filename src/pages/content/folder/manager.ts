@@ -10,6 +10,7 @@ import {
 import { DataBackupService } from '@/core/services/DataBackupService';
 import { getStorageMonitor } from '@/core/services/StorageMonitor';
 import { StorageKeys } from '@/core/types/common';
+import { SyncStorageKeys } from '@/core/types/sync';
 import type { PromptItem, SyncAccountScope } from '@/core/types/sync';
 import { isSafari } from '@/core/utils/browser';
 import { isExtensionContextInvalidatedError } from '@/core/utils/extensionContext';
@@ -6992,10 +6993,17 @@ export class FolderManager {
         `Uploading - folders: ${folders.folders?.length || 0}, prompts: ${prompts.length}`,
       );
 
+      // Read sync provider from storage
+      const providerResult = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+      const uploadType =
+        providerResult[SyncStorageKeys.PROVIDER] === 'local-folder'
+          ? 'gv.sync.localUpload'
+          : 'gv.sync.upload';
+
       // Send upload request to background script
       // Background script will also fetch starred messages for Gemini platform
       const response = (await browser.runtime.sendMessage({
-        type: 'gv.sync.upload',
+        type: uploadType,
         payload: {
           folders,
           prompts,
@@ -7025,9 +7033,16 @@ export class FolderManager {
     try {
       this.showNotification(this.t('downloadInProgress'), 'info');
 
+      // Read sync provider from storage
+      const providerResult = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+      const downloadType =
+        providerResult[SyncStorageKeys.PROVIDER] === 'local-folder'
+          ? 'gv.sync.localDownload'
+          : 'gv.sync.download';
+
       // Send download request to background script
       const response = (await browser.runtime.sendMessage({
-        type: 'gv.sync.download',
+        type: downloadType,
         payload: {
           platform: 'gemini',
           accountScope: this.toSyncAccountScope(this.accountScope),
