@@ -943,6 +943,62 @@
     "message": "فشل المصادقة",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "وجهة المزامنة",
+    "description": "عنوان منتقي مزود المزامنة"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "تسمية خيار Google Drive في منتقي مزود المزامنة"
+  },
+  "syncProviderLocalFolder": {
+    "message": "مجلد محلي",
+    "description": "تسمية خيار المجلد المحلي في منتقي مزود المزامنة"
+  },
+  "syncLocalFolderSelect": {
+    "message": "اختر مجلدًا",
+    "description": "تسمية زر فتح منتقي المجلدات للمزامنة المحلية"
+  },
+  "syncLocalFolderConnected": {
+    "message": "متصل بالمجلد",
+    "description": "رسالة الحالة عند اتصال مجلد محلي"
+  },
+  "syncFolderConnected": {
+    "message": "متصل: {name}",
+    "description": "رسالة الحالة تعرض اسم مجلد محلي متصل"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "لم يتم تحديد مجلد",
+    "description": "رسالة الحالة عند عدم تحديد مجلد محلي"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "تم رفض الإذن. يرجى منح الوصول إلى المجلد.",
+    "description": "خطأ عند رفض إذن الوصول إلى المجلد"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "المجلد المحدد لم يعد متاحًا. يرجى تحديد مجلد جديد.",
+    "description": "خطأ عندما لا يمكن الوصول إلى المجلد المحدد"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "مزامنة المجلد المحلي غير مدعومة في هذا المتصفح. استخدم Chrome أو Edge.",
+    "description": "خطأ عندما لا يدعم المتصفح واجهة برمجة تطبيقات الوصول إلى نظام الملفات"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "منح الوصول",
+    "description": "تسمية زر منح إذن الوصول إلى المجلد"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "تغيير المجلد",
+    "description": "تسمية زر تغيير المجلد المحلي المتزامن"
+  },
+  "syncFolderRequired": {
+    "message": "يرجى تحديد مجلد مزامنة أولاً. جارٍ فتح إعدادات المجلد...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
+  "syncProviderUnsupported": {
+    "message": "غير مدعوم",
+    "description": "شارة تظهر عندما لا يكون مزود المزامنة مدعومًا في المتصفح الحالي"
+  },
   "signOut": {
     "message": "تسجيل الخروج",
     "description": "Sign out button"

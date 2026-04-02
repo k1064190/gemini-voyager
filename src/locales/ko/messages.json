@@ -943,6 +943,62 @@
     "message": "인증 실패",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "동기화 대상",
+    "description": "동기화 제공자 선택기의 제목"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "동기화 제공자 선택기의 Google Drive 옵션 레이블"
+  },
+  "syncProviderLocalFolder": {
+    "message": "로컬 폴더",
+    "description": "동기화 제공자 선택기의 로컬 폴더 옵션 레이블"
+  },
+  "syncLocalFolderSelect": {
+    "message": "폴더 선택",
+    "description": "로컬 동기화를 위한 폴더 선택 대화상자를 여는 버튼 레이블"
+  },
+  "syncLocalFolderConnected": {
+    "message": "폴더에 연결됨",
+    "description": "로컬 폴더가 연결되었을 때의 상태 메시지"
+  },
+  "syncFolderConnected": {
+    "message": "연결됨: {name}",
+    "description": "연결된 로컬 폴더 이름을 표시하는 상태 메시지"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "선택된 폴더 없음",
+    "description": "로컬 폴더가 선택되지 않았을 때의 상태 메시지"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "권한이 거부되었습니다. 폴더에 대한 액세스 권한을 부여해 주세요.",
+    "description": "폴더 액세스 권한이 거부되었을 때의 오류"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "선택한 폴더를 더 이상 사용할 수 없습니다. 새 폴더를 선택해 주세요.",
+    "description": "선택한 폴더에 더 이상 액세스할 수 없을 때의 오류"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "이 브라우저에서는 로컬 폴더 동기화가 지원되지 않습니다. Chrome 또는 Edge를 사용해 주세요.",
+    "description": "브라우저가 File System Access API를 지원하지 않을 때의 오류"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "액세스 권한 부여",
+    "description": "폴더 액세스 권한을 부여하는 버튼 레이블"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "폴더 변경",
+    "description": "동기화된 로컬 폴더를 변경하는 버튼 레이블"
+  },
+  "syncFolderRequired": {
+    "message": "먼저 동기화 폴더를 선택하세요. 폴더 설정을 여는 중...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
+  "syncProviderUnsupported": {
+    "message": "지원되지 않음",
+    "description": "현재 브라우저에서 동기화 제공자가 지원되지 않을 때 표시되는 배지"
+  },
   "signOut": {
     "message": "로그아웃",
     "description": "Sign out button"

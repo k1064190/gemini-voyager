@@ -9,6 +9,7 @@ import {
 import { DataBackupService } from '@/core/services/DataBackupService';
 import { getStorageMonitor } from '@/core/services/StorageMonitor';
 import { StorageKeys } from '@/core/types/common';
+import { SyncStorageKeys } from '@/core/types/sync';
 import type { PromptItem, SyncAccountScope } from '@/core/types/sync';
 import { isSafari } from '@/core/utils/browser';
 import { createTranslator, initI18n } from '@/utils/i18n';
@@ -2489,19 +2490,29 @@ export class AIStudioFolderManager {
         `[AIStudioFolderManager] Uploading - folders: ${folders.folders?.length || 0}, prompts: ${prompts.length}`,
       );
 
+      // Read sync provider from storage
+      const providerResult = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+      const uploadType =
+        providerResult[SyncStorageKeys.PROVIDER] === 'local-folder'
+          ? 'gv.sync.localUpload'
+          : 'gv.sync.upload';
+
       // Send upload request to background script
       const response = (await browser.runtime.sendMessage({
-        type: 'gv.sync.upload',
+        type: uploadType,
         payload: {
           folders,
           prompts,
           platform: 'aistudio',
           accountScope: this.toSyncAccountScope(this.accountScope),
         },
-      })) as { ok?: boolean; error?: string } | undefined;
+      })) as { ok?: boolean; error?: string; errorCode?: string } | undefined;
 
       if (response?.ok) {
         this.showNotification(this.t('uploadSuccess'), 'info');
+      } else if (response?.errorCode === 'no_handle' || response?.errorCode === 'permission_expired') {
+        this.showNotification(this.t('syncFolderRequired'), 'error');
+        browser.runtime.sendMessage({ type: 'gv.openLocalSyncPicker' }).catch(() => undefined);
       } else {
         const errorMsg = response?.error || 'Unknown error';
         this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
@@ -2522,9 +2533,16 @@ export class AIStudioFolderManager {
     try {
       this.showNotification(this.t('downloadInProgress'), 'info');
 
+      // Read sync provider from storage
+      const providerResult = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+      const downloadType =
+        providerResult[SyncStorageKeys.PROVIDER] === 'local-folder'
+          ? 'gv.sync.localDownload'
+          : 'gv.sync.download';
+
       // Send download request to background script
       const response = (await browser.runtime.sendMessage({
-        type: 'gv.sync.download',
+        type: downloadType,
         payload: {
           platform: 'aistudio',
           accountScope: this.toSyncAccountScope(this.accountScope),
@@ -2533,6 +2551,7 @@ export class AIStudioFolderManager {
         | {
             ok?: boolean;
             error?: string;
+            errorCode?: string;
             data?: {
               folders?: { data?: FolderData };
               prompts?: { items?: PromptItem[] };
@@ -2541,8 +2560,13 @@ export class AIStudioFolderManager {
         | undefined;
 
       if (!response?.ok) {
-        const errorMsg = response?.error || 'Download failed';
-        this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
+        if (response?.errorCode === 'no_handle' || response?.errorCode === 'permission_expired') {
+          this.showNotification(this.t('syncFolderRequired'), 'error');
+          browser.runtime.sendMessage({ type: 'gv.openLocalSyncPicker' }).catch(() => undefined);
+        } else {
+          const errorMsg = response?.error || 'Download failed';
+          this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
+        }
         return;
       }
 

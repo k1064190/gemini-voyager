@@ -21,6 +21,13 @@ export type SyncMode = 'disabled' | 'manual' | 'auto';
  */
 export type SyncPlatform = 'gemini' | 'aistudio';
 
+/**
+ * Sync provider for upload destination
+ * - google-drive: Sync via Google Drive (default, all browsers)
+ * - local-folder: Sync via local filesystem (Chromium only)
+ */
+export type SyncProvider = 'google-drive' | 'local-folder';
+
 export interface SyncAccountScope {
   accountKey: string;
   accountId: number;
@@ -45,6 +52,8 @@ export interface SyncState {
   isSyncing: boolean;
   /** Last error message (null if no error) */
   error: string | null;
+  /** Structured error code for actionable UI responses */
+  errorCode?: 'no_handle' | 'permission_expired';
   /** Whether user is authenticated with Google */
   isAuthenticated: boolean;
 }
@@ -140,6 +149,21 @@ export const SyncStorageKeys = {
   MODE: 'gvSyncMode',
   LAST_SYNC_TIME: 'gvLastSyncTime',
   SYNC_ERROR: 'gvSyncError',
+  PROVIDER: 'gvSyncProvider',
+  FOLDER_NAME: 'gvSyncFolderName',
+} as const;
+
+/**
+ * Storage keys for local-folder sync state — independent namespace to prevent
+ * collision with Google Drive sync keys when both providers are configured.
+ */
+export const LocalSyncStorageKeys = {
+  MODE: 'gvLocalSyncMode',
+  LAST_SYNC_TIME: 'gvLocalLastSyncTime',
+  LAST_UPLOAD_TIME: 'gvLocalLastUploadTime',
+  SYNC_ERROR: 'gvLocalSyncError',
+  LAST_SYNC_TIME_AISTUDIO: 'gvLocalLastSyncTimeAIStudio',
+  LAST_UPLOAD_TIME_AISTUDIO: 'gvLocalLastUploadTimeAIStudio',
 } as const;
 
 /**
@@ -165,7 +189,11 @@ export type SyncMessageType =
   | 'gv.sync.upload'
   | 'gv.sync.download'
   | 'gv.sync.getState'
-  | 'gv.sync.setMode';
+  | 'gv.sync.setMode'
+  | 'gv.sync.localUpload'
+  | 'gv.sync.localDownload'
+  | 'gv.sync.localGetState'
+  | 'gv.sync.localPickerComplete';
 
 /**
  * Message payload for sync operations
@@ -187,6 +215,8 @@ export interface SyncMessage {
 export interface SyncResponse {
   ok: boolean;
   error?: string;
+  /** Structured error code forwarded from SyncState for actionable UI responses */
+  errorCode?: 'no_handle' | 'permission_expired';
   state?: SyncState;
   data?: SyncData;
 }

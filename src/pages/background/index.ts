@@ -9,9 +9,11 @@ import {
   extractRouteUserIdFromUrl,
 } from '@/core/services/AccountIsolationService';
 import { googleDriveSyncService } from '@/core/services/GoogleDriveSyncService';
+import { localFolderSyncService } from '@/core/services/LocalFolderSyncService';
 import { StorageKeys } from '@/core/types/common';
 import type { FolderData } from '@/core/types/folder';
-import type { PromptItem, SyncAccountScope, SyncMode } from '@/core/types/sync';
+import type { PromptItem, SyncAccountScope, SyncMode, SyncProvider } from '@/core/types/sync';
+import { SyncStorageKeys } from '@/core/types/sync';
 import type { ForkNode, ForkNodesData } from '@/pages/content/fork/forkTypes';
 import type { StarredMessage, StarredMessagesData } from '@/pages/content/timeline/starredTypes';
 
@@ -138,6 +140,20 @@ function filterForkNodesByRouteScope(
     nodes: filteredNodes,
     groups: filteredGroups,
   };
+}
+
+/**
+ * Returns the active sync provider from storage.
+ * Defaults to 'google-drive' when the key is unset.
+ * No try/catch: storage errors propagate to the caller so they surface as
+ * error notifications rather than silently falling back to Google Drive
+ * (which would be a privacy violation if the user chose local-folder).
+ *
+ * @returns The active sync provider
+ */
+async function getActiveProvider(): Promise<SyncProvider> {
+  const result = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+  return result[SyncStorageKeys.PROVIDER] === 'local-folder' ? 'local-folder' : 'google-drive';
 }
 
 /**
@@ -759,6 +775,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               platform,
               isSyncAccountScope(rawScope) ? rawScope : undefined,
             );
+
+            // Defensive provider check: if user chose local-folder, never touch
+            // Google Drive — even if the caller sent the wrong message type
+            // (stale content script, extension reload timing, etc.)
+            const uploadProvider = await getActiveProvider();
+            if (uploadProvider === 'local-folder') {
+              const starredDataRaw =
+                platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
+              const forksDataRaw =
+                platform !== 'aistudio' ? await forkNodesManager.getAllForkNodes() : null;
+              const starredData =
+                starredDataRaw && accountScope
+                  ? filterStarredByRouteScope(starredDataRaw, accountScope.routeUserId)
+                  : starredDataRaw;
+              const forksData =
+                forksDataRaw && accountScope
+                  ? filterForkNodesByRouteScope(forksDataRaw, accountScope.routeUserId)
+                  : forksDataRaw;
+              const success = await localFolderSyncService.upload(
+                folders, prompts, starredData, interactive !== false,
+                platform, forksData, accountScope,
+              );
+              const uploadState = await localFolderSyncService.getState();
+              sendResponse({ ok: success, state: uploadState, errorCode: uploadState.errorCode });
+              return;
+            }
+
             // Also get starred messages and fork nodes from local storage (only for Gemini platform)
             const starredDataRaw =
               platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
@@ -793,6 +836,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               platform,
               isSyncAccountScope(rawScope) ? rawScope : undefined,
             );
+
+            // Defensive provider check: same guard as upload
+            const downloadProvider = await getActiveProvider();
+            if (downloadProvider === 'local-folder') {
+              const data = await localFolderSyncService.download(interactive, platform, accountScope);
+              const downloadState = await localFolderSyncService.getState();
+              sendResponse({
+                ok: data !== null,
+                data,
+                state: downloadState,
+                errorCode: downloadState.errorCode,
+              });
+              return;
+            }
+
             const data = await googleDriveSyncService.download(interactive, platform, accountScope);
             // NOTE: We intentionally do NOT save to storage here.
             // The caller (Popup) is responsible for merging with local data and saving.
@@ -808,18 +866,123 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
           case 'gv.sync.getState': {
-            sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
+            const provider = await getActiveProvider();
+            const state =
+              provider === 'local-folder'
+                ? await localFolderSyncService.getState()
+                : await googleDriveSyncService.getState();
+            sendResponse({ ok: true, state });
             return;
           }
           case 'gv.sync.setMode': {
             const mode = message.payload?.mode as SyncMode;
             if (mode) {
-              await googleDriveSyncService.setMode(mode);
+              const provider = await getActiveProvider();
+              if (provider === 'local-folder') {
+                await localFolderSyncService.setMode(mode);
+                sendResponse({ ok: true, state: await localFolderSyncService.getState() });
+              } else {
+                await googleDriveSyncService.setMode(mode);
+                sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
+              }
+            } else {
+              sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
             }
-            sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
             return;
           }
         }
+      }
+
+      // Handle local folder sync operations
+      if (message && message.type && message.type.startsWith('gv.sync.local')) {
+        switch (message.type) {
+          case 'gv.sync.localUpload': {
+            const {
+              folders,
+              prompts,
+              interactive,
+              platform: rawPlatform,
+              accountScope: rawScope,
+            } = message.payload as {
+              folders: FolderData;
+              prompts: PromptItem[];
+              interactive?: boolean;
+              platform?: 'gemini' | 'aistudio';
+              accountScope?: unknown;
+            };
+            const platform = rawPlatform || 'gemini';
+            const accountScope = await resolveAccountScopeForMessage(
+              sender,
+              platform,
+              isSyncAccountScope(rawScope) ? rawScope : undefined,
+            );
+            const starredDataRaw =
+              platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
+            const forksDataRaw =
+              platform !== 'aistudio' ? await forkNodesManager.getAllForkNodes() : null;
+            const starredData =
+              starredDataRaw && accountScope
+                ? filterStarredByRouteScope(starredDataRaw, accountScope.routeUserId)
+                : starredDataRaw;
+            const forksData =
+              forksDataRaw && accountScope
+                ? filterForkNodesByRouteScope(forksDataRaw, accountScope.routeUserId)
+                : forksDataRaw;
+            const success = await localFolderSyncService.upload(
+              folders,
+              prompts,
+              starredData,
+              interactive !== false,
+              platform,
+              forksData,
+              accountScope,
+            );
+            const uploadState = await localFolderSyncService.getState();
+            sendResponse({ ok: success, state: uploadState, errorCode: uploadState.errorCode });
+            return;
+          }
+          case 'gv.sync.localDownload': {
+            const interactive = message.payload?.interactive !== false;
+            const platform = (message.payload?.platform as 'gemini' | 'aistudio') || 'gemini';
+            const rawScope = message.payload?.accountScope;
+            const accountScope = await resolveAccountScopeForMessage(
+              sender,
+              platform,
+              isSyncAccountScope(rawScope) ? rawScope : undefined,
+            );
+            const data = await localFolderSyncService.download(interactive, platform, accountScope);
+            const downloadState = await localFolderSyncService.getState();
+            sendResponse({
+              ok: data !== null,
+              data,
+              state: downloadState,
+              errorCode: downloadState.errorCode,
+            });
+            return;
+          }
+          case 'gv.sync.localGetState': {
+            sendResponse({ ok: true, state: await localFolderSyncService.getState() });
+            return;
+          }
+          case 'gv.sync.localPickerComplete': {
+            // Auto-enable manual sync after folder selection
+            await localFolderSyncService.setMode('manual');
+            sendResponse({ ok: true });
+            // Close the picker tab — Chrome will focus the previously active tab
+            if (sender.tab?.id) {
+              chrome.tabs.remove(sender.tab.id);
+            }
+            return;
+          }
+        }
+      }
+
+      // Handle local sync folder picker open request from content scripts
+      // (content scripts cannot call window.open after an async roundtrip — popup blocked)
+      if (message?.type === 'gv.openLocalSyncPicker') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/local-sync/index.html') });
+        sendResponse({ ok: true });
+        return;
       }
 
       // Handle popup opening request

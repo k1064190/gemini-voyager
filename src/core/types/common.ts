@@ -110,6 +110,10 @@ export const StorageKeys = {
 
   // Popup section order
   GV_POPUP_SECTION_ORDER: 'gvPopupSectionOrder',
+
+  // Local folder sync
+  SYNC_PROVIDER: 'gvSyncProvider',
+  SYNC_FOLDER_NAME: 'gvSyncFolderName',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

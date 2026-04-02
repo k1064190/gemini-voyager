@@ -943,6 +943,62 @@
     "message": "Error de autenticación",
     "description": "Error message when authentication fails"
   },
+  "syncProviderTitle": {
+    "message": "Destino de sincronización",
+    "description": "Título del selector de proveedor de sincronización"
+  },
+  "syncProviderGoogleDrive": {
+    "message": "Google Drive",
+    "description": "Etiqueta de la opción Google Drive en el selector de proveedor"
+  },
+  "syncProviderLocalFolder": {
+    "message": "Carpeta local",
+    "description": "Etiqueta de la opción Carpeta local en el selector de proveedor"
+  },
+  "syncLocalFolderSelect": {
+    "message": "Seleccionar carpeta",
+    "description": "Etiqueta del botón para abrir el selector de carpetas para sincronización local"
+  },
+  "syncLocalFolderConnected": {
+    "message": "Carpeta conectada",
+    "description": "Mensaje de estado cuando una carpeta local está conectada"
+  },
+  "syncFolderConnected": {
+    "message": "Conectado: {name}",
+    "description": "Mensaje de estado que muestra el nombre de la carpeta local conectada"
+  },
+  "syncLocalFolderNotConnected": {
+    "message": "Ninguna carpeta seleccionada",
+    "description": "Mensaje de estado cuando no se ha seleccionado una carpeta local"
+  },
+  "syncLocalFolderPermissionDenied": {
+    "message": "Permiso denegado. Concede acceso a la carpeta.",
+    "description": "Error cuando se deniega el permiso de acceso a la carpeta"
+  },
+  "syncLocalFolderNotFound": {
+    "message": "La carpeta seleccionada ya no está disponible. Selecciona una nueva carpeta.",
+    "description": "Error cuando la carpeta seleccionada ya no es accesible"
+  },
+  "syncLocalFolderBrowserNotSupported": {
+    "message": "La sincronización de carpeta local no es compatible con este navegador. Usa Chrome o Edge.",
+    "description": "Error cuando el navegador no es compatible con la API de acceso al sistema de archivos"
+  },
+  "syncLocalFolderGrantAccess": {
+    "message": "Conceder acceso",
+    "description": "Etiqueta del botón para conceder permiso de acceso a la carpeta"
+  },
+  "syncLocalFolderChangeFolder": {
+    "message": "Cambiar carpeta",
+    "description": "Etiqueta del botón para cambiar la carpeta local sincronizada"
+  },
+  "syncFolderRequired": {
+    "message": "Por favor, selecciona primero una carpeta de sincronización. Abriendo configuración de carpeta...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
+  "syncProviderUnsupported": {
+    "message": "No compatible",
+    "description": "Distintivo que se muestra cuando el proveedor de sincronización no es compatible con el navegador actual"
+  },
   "signOut": {
     "message": "Cerrar sesión",
     "description": "Sign out button"
