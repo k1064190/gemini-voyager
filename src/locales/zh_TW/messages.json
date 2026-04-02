@@ -951,6 +951,10 @@
     "message": "變更資料夾",
     "description": "變更同步的本機資料夾的按鈕標籤"
   },
+  "syncFolderRequired": {
+    "message": "請先選擇同步資料夾。正在開啟資料夾設定...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "不支援",
     "description": "目前瀏覽器不支援該同步提供者時顯示的標記"

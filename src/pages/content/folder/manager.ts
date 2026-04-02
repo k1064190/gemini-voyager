@@ -7010,10 +7010,13 @@ export class FolderManager {
           platform: 'gemini',
           accountScope: this.toSyncAccountScope(this.accountScope),
         },
-      })) as { ok?: boolean; error?: string } | undefined;
+      })) as { ok?: boolean; error?: string; errorCode?: string } | undefined;
 
       if (response?.ok) {
         this.showNotification(this.t('uploadSuccess'), 'success');
+      } else if (response?.errorCode === 'no_handle' || response?.errorCode === 'permission_expired') {
+        this.showNotification(this.t('syncFolderRequired'), 'error');
+        browser.runtime.sendMessage({ type: 'gv.openLocalSyncPicker' }).catch(() => undefined);
       } else {
         const errorMsg = response?.error || 'Unknown error';
         this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
@@ -7051,6 +7054,7 @@ export class FolderManager {
         | {
             ok?: boolean;
             error?: string;
+            errorCode?: string;
             data?: {
               folders?: { data?: FolderData };
               prompts?: { items?: PromptItem[] };
@@ -7060,8 +7064,13 @@ export class FolderManager {
         | undefined;
 
       if (!response?.ok) {
-        const errorMsg = response?.error || 'Download failed';
-        this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
+        if (response?.errorCode === 'no_handle' || response?.errorCode === 'permission_expired') {
+          this.showNotification(this.t('syncFolderRequired'), 'error');
+          browser.runtime.sendMessage({ type: 'gv.openLocalSyncPicker' }).catch(() => undefined);
+        } else {
+          const errorMsg = response?.error || 'Download failed';
+          this.showNotification(this.t('syncError').replace('{error}', errorMsg), 'error');
+        }
         return;
       }
 

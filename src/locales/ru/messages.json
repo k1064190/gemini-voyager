@@ -991,6 +991,10 @@
     "message": "Сменить папку",
     "description": "Метка кнопки для изменения синхронизируемой локальной папки"
   },
+  "syncFolderRequired": {
+    "message": "Сначала выберите папку для синхронизации. Открываю настройки папки...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "Не поддерживается",
     "description": "Значок, отображаемый, когда провайдер синхронизации не поддерживается текущим браузером"

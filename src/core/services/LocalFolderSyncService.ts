@@ -19,7 +19,7 @@ import type {
   SyncPlatform,
   SyncState,
 } from '@/core/types/sync';
-import { DEFAULT_SYNC_STATE, SyncStorageKeys } from '@/core/types/sync';
+import { DEFAULT_SYNC_STATE, LocalSyncStorageKeys, SyncStorageKeys } from '@/core/types/sync';
 import { loadHandle, removeHandle, saveHandle } from '@/core/utils/idb';
 import { hashString } from '@/core/utils/hash';
 
@@ -87,17 +87,17 @@ export class LocalFolderSyncService {
   ): Promise<boolean> {
     const handle = await this.getHandle();
     if (!handle) {
-      this.updateState({ error: 'No folder selected for local sync', isSyncing: false });
+      this.updateState({ error: 'No folder selected for local sync', errorCode: 'no_handle', isSyncing: false });
       return false;
     }
 
     const hasPermission = await this.verifyPermission(handle);
     if (!hasPermission) {
-      this.updateState({ error: 'Permission denied for local sync folder', isSyncing: false });
+      this.updateState({ error: 'Permission expired. Please re-select the sync folder.', errorCode: 'permission_expired', isSyncing: false });
       return false;
     }
 
-    this.updateState({ isSyncing: true, error: null });
+    this.updateState({ isSyncing: true, error: null, errorCode: undefined });
 
     try {
       const now = new Date().toISOString();
@@ -141,9 +141,9 @@ export class LocalFolderSyncService {
 
       const timestamp = Date.now();
       if (isAIStudio) {
-        this.updateState({ lastUploadTimeAIStudio: timestamp, isSyncing: false });
+        this.updateState({ lastUploadTimeAIStudio: timestamp, isSyncing: false, errorCode: undefined });
       } else {
-        this.updateState({ lastUploadTime: timestamp, isSyncing: false });
+        this.updateState({ lastUploadTime: timestamp, isSyncing: false, errorCode: undefined });
       }
       await this.saveState();
       return true;
@@ -172,12 +172,13 @@ export class LocalFolderSyncService {
   } | null> {
     const handle = await this.getHandle();
     if (!handle) {
+      this.updateState({ error: 'No folder selected for local sync', errorCode: 'no_handle' });
       return null;
     }
 
     const hasPermission = await this.verifyPermission(handle);
     if (!hasPermission) {
-      this.updateState({ error: 'Permission denied for local sync folder' });
+      this.updateState({ error: 'Permission expired. Please re-select the sync folder.', errorCode: 'permission_expired' });
       return null;
     }
 
@@ -187,7 +188,7 @@ export class LocalFolderSyncService {
       const starred = await this.readJsonFile<StarredExportPayload>(handle, this.getFileName(FILE_NAMES.starred, accountScope));
       const forks = await this.readJsonFile<ForkExportPayload>(handle, this.getFileName(FILE_NAMES.forks, accountScope));
 
-      this.updateState({ lastSyncTime: Date.now(), error: null });
+      this.updateState({ lastSyncTime: Date.now(), error: null, errorCode: undefined });
       await this.saveState();
 
       return { folders, prompts, starred, forks };
@@ -263,20 +264,33 @@ export class LocalFolderSyncService {
   private async loadState(): Promise<void> {
     try {
       const result = await chrome.storage.local.get([
-        SyncStorageKeys.MODE,
-        SyncStorageKeys.LAST_SYNC_TIME,
-        SyncStorageKeys.SYNC_ERROR,
+        LocalSyncStorageKeys.MODE,
+        LocalSyncStorageKeys.LAST_SYNC_TIME,
+        LocalSyncStorageKeys.LAST_UPLOAD_TIME,
+        LocalSyncStorageKeys.SYNC_ERROR,
+        LocalSyncStorageKeys.LAST_SYNC_TIME_AISTUDIO,
+        LocalSyncStorageKeys.LAST_UPLOAD_TIME_AISTUDIO,
       ]);
       this.state = {
-        mode: (result[SyncStorageKeys.MODE] as SyncMode) || 'disabled',
-        lastSyncTime: getNumberValue(result[SyncStorageKeys.LAST_SYNC_TIME]),
-        lastUploadTime: null,
-        lastSyncTimeAIStudio: null,
-        lastUploadTimeAIStudio: null,
-        error: getStringValue(result[SyncStorageKeys.SYNC_ERROR]),
+        mode: (result[LocalSyncStorageKeys.MODE] as SyncMode) || 'disabled',
+        lastSyncTime: getNumberValue(result[LocalSyncStorageKeys.LAST_SYNC_TIME]),
+        lastUploadTime: getNumberValue(result[LocalSyncStorageKeys.LAST_UPLOAD_TIME]),
+        lastSyncTimeAIStudio: getNumberValue(result[LocalSyncStorageKeys.LAST_SYNC_TIME_AISTUDIO]),
+        lastUploadTimeAIStudio: getNumberValue(result[LocalSyncStorageKeys.LAST_UPLOAD_TIME_AISTUDIO]),
+        error: getStringValue(result[LocalSyncStorageKeys.SYNC_ERROR]),
         isSyncing: false,
         isAuthenticated: false,
       };
+
+      // One-time migration: if local keys are unset but shared keys have data,
+      // copy lastSyncTime so existing users don't lose their sync history.
+      if (!this.state.lastSyncTime) {
+        const old = await chrome.storage.local.get([SyncStorageKeys.LAST_SYNC_TIME]);
+        const migrated = getNumberValue(old[SyncStorageKeys.LAST_SYNC_TIME]);
+        if (migrated) {
+          this.state.lastSyncTime = migrated;
+        }
+      }
     } catch {
       // Storage unavailable — keep defaults
     }
@@ -285,9 +299,12 @@ export class LocalFolderSyncService {
   private async saveState(): Promise<void> {
     try {
       await chrome.storage.local.set({
-        [SyncStorageKeys.MODE]: this.state.mode,
-        [SyncStorageKeys.LAST_SYNC_TIME]: this.state.lastSyncTime,
-        [SyncStorageKeys.SYNC_ERROR]: this.state.error,
+        [LocalSyncStorageKeys.MODE]: this.state.mode,
+        [LocalSyncStorageKeys.LAST_SYNC_TIME]: this.state.lastSyncTime,
+        [LocalSyncStorageKeys.LAST_UPLOAD_TIME]: this.state.lastUploadTime,
+        [LocalSyncStorageKeys.SYNC_ERROR]: this.state.error,
+        [LocalSyncStorageKeys.LAST_SYNC_TIME_AISTUDIO]: this.state.lastSyncTimeAIStudio,
+        [LocalSyncStorageKeys.LAST_UPLOAD_TIME_AISTUDIO]: this.state.lastUploadTimeAIStudio,
       });
     } catch {
       // Storage unavailable — ignore
@@ -307,14 +324,18 @@ export class LocalFolderSyncService {
 
   private async verifyPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
     const permHandle = handle as unknown as FileSystemHandlePermission;
-    const result = await permHandle.queryPermission({ mode: 'readwrite' });
-    return result === 'granted';
-  }
+    const queryResult = await permHandle.queryPermission({ mode: 'readwrite' });
+    if (queryResult === 'granted') return true;
 
-  private async requestPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
-    const permHandle = handle as unknown as FileSystemHandlePermission;
-    const result = await permHandle.requestPermission({ mode: 'readwrite' });
-    return result === 'granted';
+    // Try requesting — works when caller has transient user activation.
+    // Service workers have no user gesture, so requestPermission will throw;
+    // catch it and return false so the caller can surface an actionable error.
+    try {
+      const requestResult = await permHandle.requestPermission({ mode: 'readwrite' });
+      return requestResult === 'granted';
+    } catch {
+      return false;
+    }
   }
 
   private async getHandle(): Promise<FileSystemDirectoryHandle | null> {

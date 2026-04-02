@@ -991,6 +991,10 @@
     "message": "Changer de dossier",
     "description": "Libellé du bouton pour changer le dossier local synchronisé"
   },
+  "syncFolderRequired": {
+    "message": "Veuillez d'abord sélectionner un dossier de synchronisation. Ouverture des paramètres du dossier...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "Non pris en charge",
     "description": "Badge affiché lorsque le fournisseur de synchronisation n'est pas pris en charge par le navigateur actuel"

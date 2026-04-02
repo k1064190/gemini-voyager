@@ -991,6 +991,10 @@
     "message": "更改文件夹",
     "description": "更改同步的本地文件夹的按钮标签"
   },
+  "syncFolderRequired": {
+    "message": "请先选择同步文件夹。正在打开文件夹设置...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "不支持",
     "description": "当前浏览器不支持该同步提供方时显示的标记"

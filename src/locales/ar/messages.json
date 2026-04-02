@@ -991,6 +991,10 @@
     "message": "تغيير المجلد",
     "description": "تسمية زر تغيير المجلد المحلي المتزامن"
   },
+  "syncFolderRequired": {
+    "message": "يرجى تحديد مجلد مزامنة أولاً. جارٍ فتح إعدادات المجلد...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "غير مدعوم",
     "description": "شارة تظهر عندما لا يكون مزود المزامنة مدعومًا في المتصفح الحالي"

@@ -991,6 +991,10 @@
     "message": "Change Folder",
     "description": "Button label to change the synced local folder"
   },
+  "syncFolderRequired": {
+    "message": "Please select a sync folder first. Opening folder settings...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "Unsupported",
     "description": "Badge shown when sync provider is not supported in the current browser"

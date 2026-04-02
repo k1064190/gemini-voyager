@@ -52,6 +52,8 @@ export interface SyncState {
   isSyncing: boolean;
   /** Last error message (null if no error) */
   error: string | null;
+  /** Structured error code for actionable UI responses */
+  errorCode?: 'no_handle' | 'permission_expired';
   /** Whether user is authenticated with Google */
   isAuthenticated: boolean;
 }
@@ -152,6 +154,19 @@ export const SyncStorageKeys = {
 } as const;
 
 /**
+ * Storage keys for local-folder sync state — independent namespace to prevent
+ * collision with Google Drive sync keys when both providers are configured.
+ */
+export const LocalSyncStorageKeys = {
+  MODE: 'gvLocalSyncMode',
+  LAST_SYNC_TIME: 'gvLocalLastSyncTime',
+  LAST_UPLOAD_TIME: 'gvLocalLastUploadTime',
+  SYNC_ERROR: 'gvLocalSyncError',
+  LAST_SYNC_TIME_AISTUDIO: 'gvLocalLastSyncTimeAIStudio',
+  LAST_UPLOAD_TIME_AISTUDIO: 'gvLocalLastUploadTimeAIStudio',
+} as const;
+
+/**
  * Default sync state for initial load
  */
 export const DEFAULT_SYNC_STATE: SyncState = {
@@ -200,6 +215,8 @@ export interface SyncMessage {
 export interface SyncResponse {
   ok: boolean;
   error?: string;
+  /** Structured error code forwarded from SyncState for actionable UI responses */
+  errorCode?: 'no_handle' | 'permission_expired';
   state?: SyncState;
   data?: SyncData;
 }

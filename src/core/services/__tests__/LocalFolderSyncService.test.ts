@@ -117,13 +117,13 @@ describe('LocalFolderSyncService — getState / setMode', () => {
     expect(state.error).toBeNull();
   });
 
-  it('setMode persists to chrome.storage.local', async () => {
+  it('setMode persists to chrome.storage.local using LocalSyncStorageKeys', async () => {
     const Service = await loadServiceClass();
     const service = new Service();
     await service.getState(); // drain stateLoadPromise before mutating
     await service.setMode('manual');
     expect(chromeMock.storage.local.set).toHaveBeenCalledWith(
-      expect.objectContaining({ gvSyncMode: 'manual' }),
+      expect.objectContaining({ gvLocalSyncMode: 'manual' }),
     );
   });
 
@@ -178,13 +178,14 @@ describe('LocalFolderSyncService — upload', () => {
   it('returns false and sets error when permission denied', async () => {
     const handle = createMockHandle();
     handle.queryPermission.mockResolvedValue('denied');
+    handle.requestPermission.mockResolvedValue('denied');
     vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
     const Service = await loadServiceClass();
     const service = new Service();
     const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
     expect(ok).toBe(false);
     const state = await service.getState();
-    expect(state.error).toContain('Permission denied');
+    expect(state.error).toContain('Permission expired');
   });
 
   it('uploads folders and prompts files on success', async () => {
@@ -307,13 +308,14 @@ describe('LocalFolderSyncService — download', () => {
   it('returns null and sets error when permission denied', async () => {
     const handle = createMockHandle();
     handle.queryPermission.mockResolvedValue('denied');
+    handle.requestPermission.mockResolvedValue('denied');
     vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
     const Service = await loadServiceClass();
     const service = new Service();
     const result = await service.download(true, 'gemini', null);
     expect(result).toBeNull();
     const state = await service.getState();
-    expect(state.error).toContain('Permission denied');
+    expect(state.error).toContain('Permission expired');
   });
 
   it('sets lastSyncTime on successful download', async () => {
@@ -366,5 +368,211 @@ describe('LocalFolderSyncService — download', () => {
     const service = new Service();
     const result = await service.download(true, 'gemini', null);
     expect(result?.folders).toEqual(foldersPayload);
+  });
+});
+
+describe('LocalFolderSyncService — error codes', () => {
+  let chromeMock: MockedChrome;
+
+  beforeEach(() => {
+    chromeMock = createChromeMock();
+    vi.stubGlobal('chrome', chromeMock);
+    vi.mocked(loadHandle).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const folders = { folders: [], folderContents: {} };
+  const prompts: { id: string; text: string; tags: string[]; createdAt: number }[] = [];
+
+  it('upload sets errorCode no_handle when no handle stored', async () => {
+    vi.mocked(loadHandle).mockResolvedValue(null);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('no_handle');
+  });
+
+  it('upload sets errorCode permission_expired when permission cannot be obtained', async () => {
+    const handle = createMockHandle();
+    handle.queryPermission.mockResolvedValue('prompt');
+    handle.requestPermission.mockResolvedValue('denied');
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('permission_expired');
+  });
+
+  it('upload clears errorCode on success', async () => {
+    const handle = createMockHandle();
+    // Simulate a prior error state, then a successful upload
+    vi.mocked(loadHandle).mockResolvedValueOnce(null); // first call → no_handle
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.upload(folders, prompts, null, true, 'gemini', null, null); // sets errorCode
+    await service.upload(folders, prompts, null, true, 'gemini', null, null); // clears it
+    const state = await service.getState();
+    expect(state.errorCode).toBeUndefined();
+  });
+
+  it('download sets errorCode no_handle when no handle stored', async () => {
+    vi.mocked(loadHandle).mockResolvedValue(null);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.download(true, 'gemini', null);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('no_handle');
+  });
+
+  it('download sets errorCode permission_expired when permission cannot be obtained', async () => {
+    const handle = createMockHandle();
+    handle.queryPermission.mockResolvedValue('prompt');
+    handle.requestPermission.mockResolvedValue('denied');
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.download(true, 'gemini', null);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('permission_expired');
+  });
+
+  it('download clears errorCode on success', async () => {
+    const handle = createMockHandle();
+    vi.mocked(loadHandle).mockResolvedValueOnce(null); // first → no_handle
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.download(true, 'gemini', null); // sets errorCode
+    await service.download(true, 'gemini', null); // clears it
+    const state = await service.getState();
+    expect(state.errorCode).toBeUndefined();
+  });
+});
+
+describe('LocalFolderSyncService — verifyPermission fallback', () => {
+  let chromeMock: MockedChrome;
+
+  beforeEach(() => {
+    chromeMock = createChromeMock();
+    vi.stubGlobal('chrome', chromeMock);
+    vi.mocked(loadHandle).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const folders = { folders: [], folderContents: {} };
+  const prompts: { id: string; text: string; tags: string[]; createdAt: number }[] = [];
+
+  it('succeeds when queryPermission returns prompt but requestPermission returns granted', async () => {
+    const handle = createMockHandle();
+    handle.queryPermission.mockResolvedValue('prompt');
+    handle.requestPermission.mockResolvedValue('granted');
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(true);
+    expect(handle.requestPermission).toHaveBeenCalledWith({ mode: 'readwrite' });
+    const state = await service.getState();
+    expect(state.errorCode).toBeUndefined();
+  });
+
+  it('returns permission_expired when requestPermission throws (service worker context)', async () => {
+    const handle = createMockHandle();
+    handle.queryPermission.mockResolvedValue('prompt');
+    handle.requestPermission.mockRejectedValue(new DOMException('Not allowed', 'NotAllowedError'));
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(false);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('permission_expired');
+  });
+});
+
+describe('LocalFolderSyncService — state persistence', () => {
+  let chromeMock: MockedChrome;
+
+  beforeEach(() => {
+    chromeMock = createChromeMock();
+    vi.stubGlobal('chrome', chromeMock);
+    vi.mocked(loadHandle).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const folders = { folders: [], folderContents: {} };
+  const prompts: { id: string; text: string; tags: string[]; createdAt: number }[] = [];
+
+  it('saveState persists all timestamps using LocalSyncStorageKeys', async () => {
+    const handle = createMockHandle();
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    const setCall = (chromeMock.storage.local.set as ReturnType<typeof vi.fn>).mock.calls.find(
+      (c: unknown[]) => {
+        const arg = c[0] as Record<string, unknown>;
+        return 'gvLocalLastUploadTime' in arg;
+      },
+    );
+    expect(setCall).toBeDefined();
+    const saved = setCall![0] as Record<string, unknown>;
+    expect(saved['gvLocalSyncMode']).toBeDefined();
+    expect(saved['gvLocalLastUploadTime']).toBeTypeOf('number');
+  });
+
+  it('loadState restores timestamps from LocalSyncStorageKeys on next init', async () => {
+    const storedTime = 1710000000000;
+    (chromeMock.storage.local.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      gvLocalSyncMode: 'manual',
+      gvLocalLastSyncTime: storedTime,
+      gvLocalLastUploadTime: storedTime + 1,
+      gvLocalSyncError: null,
+      gvLocalLastSyncTimeAIStudio: storedTime + 2,
+      gvLocalLastUploadTimeAIStudio: storedTime + 3,
+    });
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const state = await service.getState();
+    expect(state.mode).toBe('manual');
+    expect(state.lastSyncTime).toBe(storedTime);
+    expect(state.lastUploadTime).toBe(storedTime + 1);
+    expect(state.lastSyncTimeAIStudio).toBe(storedTime + 2);
+    expect(state.lastUploadTimeAIStudio).toBe(storedTime + 3);
+  });
+
+  it('loadState migrates lastSyncTime from shared key when local key is absent', async () => {
+    const migratedTime = 1700000000000;
+    // The module-level singleton + each new Service() call loadState(), so use
+    // key-aware mockImplementation instead of mockResolvedValueOnce to avoid
+    // ordering issues with how many times the mock is called before our instance.
+    (chromeMock.storage.local.get as ReturnType<typeof vi.fn>).mockImplementation(
+      (keys: unknown) => {
+        const arr = Array.isArray(keys) ? keys : [keys];
+        if (arr.includes('gvLastSyncTime')) {
+          return Promise.resolve({ gvLastSyncTime: migratedTime });
+        }
+        return Promise.resolve({});
+      },
+    );
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const state = await service.getState();
+    expect(state.lastSyncTime).toBe(migratedTime);
   });
 });

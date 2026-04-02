@@ -991,6 +991,10 @@
     "message": "Alterar pasta",
     "description": "Rótulo do botão para alterar a pasta local sincronizada"
   },
+  "syncFolderRequired": {
+    "message": "Por favor, selecione primeiro uma pasta de sincronização. Abrindo configurações da pasta...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "Incompatível",
     "description": "Distintivo exibido quando o provedor de sincronização não é compatível com o navegador atual"

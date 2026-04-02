@@ -12,7 +12,8 @@ import { googleDriveSyncService } from '@/core/services/GoogleDriveSyncService';
 import { localFolderSyncService } from '@/core/services/LocalFolderSyncService';
 import { StorageKeys } from '@/core/types/common';
 import type { FolderData } from '@/core/types/folder';
-import type { PromptItem, SyncAccountScope, SyncMode } from '@/core/types/sync';
+import type { PromptItem, SyncAccountScope, SyncMode, SyncProvider } from '@/core/types/sync';
+import { SyncStorageKeys } from '@/core/types/sync';
 import type { ForkNode, ForkNodesData } from '@/pages/content/fork/forkTypes';
 import type { StarredMessage, StarredMessagesData } from '@/pages/content/timeline/starredTypes';
 
@@ -139,6 +140,20 @@ function filterForkNodesByRouteScope(
     nodes: filteredNodes,
     groups: filteredGroups,
   };
+}
+
+/**
+ * Returns the active sync provider from storage.
+ * Defaults to 'google-drive' when the key is unset.
+ * No try/catch: storage errors propagate to the caller so they surface as
+ * error notifications rather than silently falling back to Google Drive
+ * (which would be a privacy violation if the user chose local-folder).
+ *
+ * @returns The active sync provider
+ */
+async function getActiveProvider(): Promise<SyncProvider> {
+  const result = await chrome.storage.local.get(SyncStorageKeys.PROVIDER);
+  return result[SyncStorageKeys.PROVIDER] === 'local-folder' ? 'local-folder' : 'google-drive';
 }
 
 /**
@@ -809,15 +824,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
           case 'gv.sync.getState': {
-            sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
+            const provider = await getActiveProvider();
+            const state =
+              provider === 'local-folder'
+                ? await localFolderSyncService.getState()
+                : await googleDriveSyncService.getState();
+            sendResponse({ ok: true, state });
             return;
           }
           case 'gv.sync.setMode': {
             const mode = message.payload?.mode as SyncMode;
             if (mode) {
-              await googleDriveSyncService.setMode(mode);
+              const provider = await getActiveProvider();
+              if (provider === 'local-folder') {
+                await localFolderSyncService.setMode(mode);
+                sendResponse({ ok: true, state: await localFolderSyncService.getState() });
+              } else {
+                await googleDriveSyncService.setMode(mode);
+                sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
+              }
+            } else {
+              sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
             }
-            sendResponse({ ok: true, state: await googleDriveSyncService.getState() });
             return;
           }
         }
@@ -867,7 +895,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               forksData,
               accountScope,
             );
-            sendResponse({ ok: success, state: await localFolderSyncService.getState() });
+            const uploadState = await localFolderSyncService.getState();
+            sendResponse({ ok: success, state: uploadState, errorCode: uploadState.errorCode });
             return;
           }
           case 'gv.sync.localDownload': {
@@ -880,10 +909,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               isSyncAccountScope(rawScope) ? rawScope : undefined,
             );
             const data = await localFolderSyncService.download(interactive, platform, accountScope);
+            const downloadState = await localFolderSyncService.getState();
             sendResponse({
-              ok: true,
+              ok: data !== null,
               data,
-              state: await localFolderSyncService.getState(),
+              state: downloadState,
+              errorCode: downloadState.errorCode,
             });
             return;
           }
@@ -896,6 +927,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
         }
+      }
+
+      // Handle local sync folder picker open request from content scripts
+      // (content scripts cannot call window.open after an async roundtrip — popup blocked)
+      if (message?.type === 'gv.openLocalSyncPicker') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('src/pages/local-sync/index.html') });
+        sendResponse({ ok: true });
+        return;
       }
 
       // Handle popup opening request

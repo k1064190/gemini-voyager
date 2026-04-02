@@ -991,6 +991,10 @@
     "message": "Cambiar carpeta",
     "description": "Etiqueta del botón para cambiar la carpeta local sincronizada"
   },
+  "syncFolderRequired": {
+    "message": "Por favor, selecciona primero una carpeta de sincronización. Abriendo configuración de carpeta...",
+    "description": "Error shown when upload/sync is triggered but no local folder is configured or permission has expired"
+  },
   "syncProviderUnsupported": {
     "message": "No compatible",
     "description": "Distintivo que se muestra cuando el proveedor de sincronización no es compatible con el navegador actual"
