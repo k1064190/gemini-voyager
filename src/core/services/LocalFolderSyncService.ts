@@ -239,6 +239,12 @@ export class LocalFolderSyncService {
     } finally {
       await writable.close();
     }
+    // Verify write landed on disk — catches silent FSA failures in service workers
+    const verifyHandle = await handle.getFileHandle(name);
+    const file = await verifyHandle.getFile();
+    if (file.size === 0) {
+      throw new Error('Write verification failed: file is empty after write');
+    }
   }
 
   private async readJsonFile<T>(
@@ -325,7 +331,22 @@ export class LocalFolderSyncService {
   private async verifyPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
     const permHandle = handle as unknown as FileSystemHandlePermission;
     const queryResult = await permHandle.queryPermission({ mode: 'readwrite' });
-    if (queryResult === 'granted') return true;
+    if (queryResult === 'granted') {
+      // I/O probe: queryPermission can return stale 'granted' in service workers.
+      // Attempt a real write+read to confirm the permission is live.
+      try {
+        const probeHandle = await handle.getFileHandle('.gv-sync-probe', { create: true });
+        const writable = await probeHandle.createWritable();
+        await writable.write('ok');
+        await writable.close();
+        const file = await (await handle.getFileHandle('.gv-sync-probe')).getFile();
+        const text = await file.text();
+        if (text !== 'ok') return false;
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     // Try requesting — works when caller has transient user activation.
     // Service workers have no user gesture, so requestPermission will throw;

@@ -37,8 +37,14 @@ function createChromeMock(): MockedChrome {
   } as unknown as MockedChrome;
 }
 
-/** Creates a mock FileSystemDirectoryHandle that reads/writes in-memory. */
-function createMockHandle(name = 'test-folder') {
+/**
+ * Creates a mock FileSystemDirectoryHandle that reads/writes in-memory.
+ *
+ * @param name - directory handle name
+ * @param opts.staleWrite - when true, close() succeeds but does NOT persist data,
+ *   simulating a stale File System Access API permission in a service worker.
+ */
+function createMockHandle(name = 'test-folder', opts?: { staleWrite?: boolean }) {
   const files = new Map<string, string>();
   return {
     name,
@@ -47,10 +53,13 @@ function createMockHandle(name = 'test-folder') {
     requestPermission: vi.fn().mockResolvedValue('granted'),
     getFileHandle: vi.fn().mockImplementation((fileName: string) => {
       return Promise.resolve({
-        getFile: () =>
-          Promise.resolve({
-            text: () => Promise.resolve(files.get(fileName) ?? ''),
-          }),
+        getFile: () => {
+          const content = files.get(fileName) ?? '';
+          return Promise.resolve({
+            text: () => Promise.resolve(content),
+            size: content.length,
+          });
+        },
         createWritable: () => {
           let written = '';
           return Promise.resolve({
@@ -59,7 +68,9 @@ function createMockHandle(name = 'test-folder') {
               return Promise.resolve();
             }),
             close: vi.fn().mockImplementation(() => {
-              files.set(fileName, written);
+              if (!opts?.staleWrite) {
+                files.set(fileName, written);
+              }
               return Promise.resolve();
             }),
           });
@@ -253,8 +264,8 @@ describe('LocalFolderSyncService — upload', () => {
     await service.upload(folders, prompts, null, true, 'gemini', null, accountScope);
     const names = handle.getFileHandle.mock.calls.map((c: unknown[]) => c[0]);
     // hashString mock returns `hash-${input}`
-    expect(names[0]).toBe('gemini-voyager-folders-acct-hash-user@example.com.json');
-    expect(names[1]).toBe('gemini-voyager-prompts-acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-folders-acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-prompts-acct-hash-user@example.com.json');
   });
 
   it('uses base file names when accountScope is null', async () => {
@@ -264,8 +275,8 @@ describe('LocalFolderSyncService — upload', () => {
     const service = new Service();
     await service.upload(folders, prompts, null, true, 'gemini', null, null);
     const names = handle.getFileHandle.mock.calls.map((c: unknown[]) => c[0]);
-    expect(names[0]).toBe('gemini-voyager-folders.json');
-    expect(names[1]).toBe('gemini-voyager-prompts.json');
+    expect(names).toContain('gemini-voyager-folders.json');
+    expect(names).toContain('gemini-voyager-prompts.json');
   });
 
   it('written JSON has correct payload format and version', async () => {
@@ -350,7 +361,7 @@ describe('LocalFolderSyncService — download', () => {
     const accountScope = { accountKey: 'user@example.com', accountId: 1, routeUserId: 'uid' };
     await service.download(true, 'gemini', accountScope);
     const names = handle.getFileHandle.mock.calls.map((c: unknown[]) => c[0]);
-    expect(names[0]).toBe('gemini-voyager-folders-acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-folders-acct-hash-user@example.com.json');
   });
 
   it('returns parsed payloads from stored JSON files', async () => {
@@ -574,5 +585,106 @@ describe('LocalFolderSyncService — state persistence', () => {
     const service = new Service();
     const state = await service.getState();
     expect(state.lastSyncTime).toBe(migratedTime);
+  });
+});
+
+describe('LocalFolderSyncService — write verification', () => {
+  let chromeMock: MockedChrome;
+
+  beforeEach(() => {
+    chromeMock = createChromeMock();
+    vi.stubGlobal('chrome', chromeMock);
+    vi.mocked(loadHandle).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const folders = { folders: [], folderContents: {} };
+  const prompts: { id: string; text: string; tags: string[]; createdAt: number }[] = [];
+
+  it('upload returns false when write completes but file is empty (stale permission)', async () => {
+    // Use requestPermission path to bypass I/O probe, so we reach writeJsonFile
+    // with stale writes that close() without persisting data.
+    const handle = createMockHandle('stale-folder', { staleWrite: true });
+    handle.queryPermission.mockResolvedValue('prompt');
+    handle.requestPermission.mockResolvedValue('granted');
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(false);
+    const state = await service.getState();
+    expect(state.error).toContain('verification failed');
+  });
+
+  it('upload succeeds when write verification reads back non-empty file', async () => {
+    const handle = createMockHandle();
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(true);
+  });
+});
+
+describe('LocalFolderSyncService — permission I/O probe', () => {
+  let chromeMock: MockedChrome;
+
+  beforeEach(() => {
+    chromeMock = createChromeMock();
+    vi.stubGlobal('chrome', chromeMock);
+    vi.mocked(loadHandle).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const folders = { folders: [], folderContents: {} };
+  const prompts: { id: string; text: string; tags: string[]; createdAt: number }[] = [];
+
+  it('returns permission_expired when I/O probe write fails despite queryPermission granted', async () => {
+    const handle = createMockHandle('probe-fail', { staleWrite: true });
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(false);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('permission_expired');
+  });
+
+  it('returns permission_expired when I/O probe throws', async () => {
+    const handle = createMockHandle();
+    // Override getFileHandle to throw for the probe file
+    const originalImpl = handle.getFileHandle.getMockImplementation()!;
+    handle.getFileHandle.mockImplementation((fileName: string, opts?: { create?: boolean }) => {
+      if (fileName === '.gv-sync-probe') {
+        return Promise.reject(new DOMException('Not allowed', 'NotAllowedError'));
+      }
+      return originalImpl(fileName, opts);
+    });
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(false);
+    const state = await service.getState();
+    expect(state.errorCode).toBe('permission_expired');
+  });
+
+  it('passes when I/O probe write and read-back succeed', async () => {
+    const handle = createMockHandle();
+    vi.mocked(loadHandle).mockResolvedValue(handle as unknown as FileSystemDirectoryHandle);
+    const Service = await loadServiceClass();
+    const service = new Service();
+    const ok = await service.upload(folders, prompts, null, true, 'gemini', null, null);
+    expect(ok).toBe(true);
+    // Probe file should exist in mock file store
+    expect(handle._files.has('.gv-sync-probe')).toBe(true);
   });
 });
