@@ -1,9 +1,9 @@
 /**
  * Local Folder Sync Service
  *
- * Skeleton service for syncing extension data to a local filesystem folder
- * via the File System Access API. Mirrors GoogleDriveSyncService's public API.
- * Upload and download methods are stubs — to be implemented later.
+ * Syncs extension data to a local filesystem folder via the File System Access API.
+ * Mirrors GoogleDriveSyncService's public API. Payload construction and file naming
+ * are shared via `@/core/utils/syncPayload` so both providers stay in sync.
  */
 import type { FolderData } from '@/core/types/folder';
 import type {
@@ -20,8 +20,15 @@ import type {
   SyncState,
 } from '@/core/types/sync';
 import { DEFAULT_SYNC_STATE, LocalSyncStorageKeys, SyncStorageKeys } from '@/core/types/sync';
-import { loadHandle, removeHandle, saveHandle } from '@/core/utils/idb';
-import { hashString } from '@/core/utils/hash';
+import { loadHandle, removeHandle } from '@/core/utils/idb';
+import {
+  buildFolderPayload,
+  buildForkPayload,
+  buildPromptPayload,
+  buildStarredPayload,
+  getSyncBaseFileName,
+  scopeFileName,
+} from '@/core/utils/syncPayload';
 
 function getStringValue(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
@@ -30,15 +37,6 @@ function getStringValue(value: unknown): string | null {
 function getNumberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
-
-const FILE_NAMES = {
-  folders: 'gemini-voyager-folders.json',
-  prompts: 'gemini-voyager-prompts.json',
-  starred: 'gemini-voyager-starred.json',
-  forks: 'gemini-voyager-forks.json',
-} as const;
-
-const VERSION = '1';
 
 /**
  * File System Access API permission methods not yet in TypeScript DOM lib.
@@ -103,40 +101,32 @@ export class LocalFolderSyncService {
       const now = new Date().toISOString();
       const isAIStudio = platform === 'aistudio';
 
-      const folderPayload: FolderExportPayload = {
-        format: 'gemini-voyager.folders.v1',
-        exportedAt: now,
-        version: VERSION,
-        data: folders,
-      };
-      await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.folders, accountScope), folderPayload);
+      await this.writeJsonFile(
+        handle,
+        scopeFileName(getSyncBaseFileName('folders', platform), accountScope),
+        buildFolderPayload(folders, now),
+      );
 
-      const promptPayload: PromptExportPayload = {
-        format: 'gemini-voyager.prompts.v1',
-        exportedAt: now,
-        version: VERSION,
-        items: prompts,
-      };
-      await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.prompts, accountScope), promptPayload);
+      await this.writeJsonFile(
+        handle,
+        scopeFileName(getSyncBaseFileName('prompts', platform), accountScope),
+        buildPromptPayload(prompts, now),
+      );
 
       if (starred) {
-        const starredPayload: StarredExportPayload = {
-          format: 'gemini-voyager.starred.v1',
-          exportedAt: now,
-          version: VERSION,
-          data: starred,
-        };
-        await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.starred, accountScope), starredPayload);
+        await this.writeJsonFile(
+          handle,
+          scopeFileName(getSyncBaseFileName('starred', platform), accountScope),
+          buildStarredPayload(starred, now),
+        );
       }
 
       if (forks) {
-        const forkPayload: ForkExportPayload = {
-          format: 'gemini-voyager.forks.v1',
-          exportedAt: now,
-          version: VERSION,
-          data: forks,
-        };
-        await this.writeJsonFile(handle, this.getFileName(FILE_NAMES.forks, accountScope), forkPayload);
+        await this.writeJsonFile(
+          handle,
+          scopeFileName(getSyncBaseFileName('forks', platform), accountScope),
+          buildForkPayload(forks, now),
+        );
       }
 
       const timestamp = Date.now();
@@ -162,7 +152,7 @@ export class LocalFolderSyncService {
 
   async download(
     _interactive: boolean,
-    _platform: SyncPlatform,
+    platform: SyncPlatform,
     accountScope: SyncAccountScope | null,
   ): Promise<{
     folders: FolderExportPayload | null;
@@ -183,10 +173,10 @@ export class LocalFolderSyncService {
     }
 
     try {
-      const folders = await this.readJsonFile<FolderExportPayload>(handle, this.getFileName(FILE_NAMES.folders, accountScope));
-      const prompts = await this.readJsonFile<PromptExportPayload>(handle, this.getFileName(FILE_NAMES.prompts, accountScope));
-      const starred = await this.readJsonFile<StarredExportPayload>(handle, this.getFileName(FILE_NAMES.starred, accountScope));
-      const forks = await this.readJsonFile<ForkExportPayload>(handle, this.getFileName(FILE_NAMES.forks, accountScope));
+      const folders = await this.readJsonFile<FolderExportPayload>(handle, scopeFileName(getSyncBaseFileName('folders', platform), accountScope));
+      const prompts = await this.readJsonFile<PromptExportPayload>(handle, scopeFileName(getSyncBaseFileName('prompts', platform), accountScope));
+      const starred = await this.readJsonFile<StarredExportPayload>(handle, scopeFileName(getSyncBaseFileName('starred', platform), accountScope));
+      const forks = await this.readJsonFile<ForkExportPayload>(handle, scopeFileName(getSyncBaseFileName('forks', platform), accountScope));
 
       this.updateState({ lastSyncTime: Date.now(), error: null, errorCode: undefined });
       await this.saveState();
@@ -202,16 +192,6 @@ export class LocalFolderSyncService {
       this.updateState({ error: message });
       return null;
     }
-  }
-
-  /**
-   * Returns a scoped file name for multi-account isolation.
-   * Appends `-acct-{hash}` before `.json` when an accountScope is provided.
-   */
-  private getFileName(baseName: string, accountScope: SyncAccountScope | null): string {
-    if (!accountScope) return baseName;
-    const suffix = `acct-${hashString(accountScope.accountKey)}`;
-    return baseName.replace('.json', `-${suffix}.json`);
   }
 
   private getErrorMessage(err: DOMException): string {

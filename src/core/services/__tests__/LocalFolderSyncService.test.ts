@@ -11,6 +11,11 @@ vi.mock('@/core/utils/hash', () => ({
   hashString: vi.fn((input: string) => `hash-${input}`),
 }));
 
+// Stable version for payload assertions
+vi.mock('@/core/utils/version', () => ({
+  EXTENSION_VERSION: '1.0.0-test',
+}));
+
 import { loadHandle, removeHandle } from '@/core/utils/idb';
 
 type MockedChrome = typeof chrome;
@@ -264,8 +269,8 @@ describe('LocalFolderSyncService — upload', () => {
     await service.upload(folders, prompts, null, true, 'gemini', null, accountScope);
     const names = handle.getFileHandle.mock.calls.map((c: unknown[]) => c[0]);
     // hashString mock returns `hash-${input}`
-    expect(names).toContain('gemini-voyager-folders-acct-hash-user@example.com.json');
-    expect(names).toContain('gemini-voyager-prompts-acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-folders.acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-prompts.acct-hash-user@example.com.json');
   });
 
   it('uses base file names when accountScope is null', async () => {
@@ -289,7 +294,7 @@ describe('LocalFolderSyncService — upload', () => {
     const text = handle._files.get('gemini-voyager-folders.json') ?? '';
     const parsed = JSON.parse(text) as { format?: string; version?: string };
     expect(parsed.format).toBe('gemini-voyager.folders.v1');
-    expect(parsed.version).toBe('1');
+    expect(parsed.version).toBe('1.0.0-test');
   });
 });
 
@@ -361,7 +366,7 @@ describe('LocalFolderSyncService — download', () => {
     const accountScope = { accountKey: 'user@example.com', accountId: 1, routeUserId: 'uid' };
     await service.download(true, 'gemini', accountScope);
     const names = handle.getFileHandle.mock.calls.map((c: unknown[]) => c[0]);
-    expect(names).toContain('gemini-voyager-folders-acct-hash-user@example.com.json');
+    expect(names).toContain('gemini-voyager-folders.acct-hash-user@example.com.json');
   });
 
   it('returns parsed payloads from stored JSON files', async () => {
