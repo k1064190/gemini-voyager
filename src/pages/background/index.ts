@@ -775,6 +775,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               platform,
               isSyncAccountScope(rawScope) ? rawScope : undefined,
             );
+
+            // Defensive provider check: if user chose local-folder, never touch
+            // Google Drive — even if the caller sent the wrong message type
+            // (stale content script, extension reload timing, etc.)
+            const uploadProvider = await getActiveProvider();
+            if (uploadProvider === 'local-folder') {
+              const starredDataRaw =
+                platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
+              const forksDataRaw =
+                platform !== 'aistudio' ? await forkNodesManager.getAllForkNodes() : null;
+              const starredData =
+                starredDataRaw && accountScope
+                  ? filterStarredByRouteScope(starredDataRaw, accountScope.routeUserId)
+                  : starredDataRaw;
+              const forksData =
+                forksDataRaw && accountScope
+                  ? filterForkNodesByRouteScope(forksDataRaw, accountScope.routeUserId)
+                  : forksDataRaw;
+              const success = await localFolderSyncService.upload(
+                folders, prompts, starredData, interactive !== false,
+                platform, forksData, accountScope,
+              );
+              const uploadState = await localFolderSyncService.getState();
+              sendResponse({ ok: success, state: uploadState, errorCode: uploadState.errorCode });
+              return;
+            }
+
             // Also get starred messages and fork nodes from local storage (only for Gemini platform)
             const starredDataRaw =
               platform !== 'aistudio' ? await starredMessagesManager.getAllStarredMessages() : null;
@@ -809,6 +836,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               platform,
               isSyncAccountScope(rawScope) ? rawScope : undefined,
             );
+
+            // Defensive provider check: same guard as upload
+            const downloadProvider = await getActiveProvider();
+            if (downloadProvider === 'local-folder') {
+              const data = await localFolderSyncService.download(interactive, platform, accountScope);
+              const downloadState = await localFolderSyncService.getState();
+              sendResponse({
+                ok: data !== null,
+                data,
+                state: downloadState,
+                errorCode: downloadState.errorCode,
+              });
+              return;
+            }
+
             const data = await googleDriveSyncService.download(interactive, platform, accountScope);
             // NOTE: We intentionally do NOT save to storage here.
             // The caller (Popup) is responsible for merging with local data and saving.
