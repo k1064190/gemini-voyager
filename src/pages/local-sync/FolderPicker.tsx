@@ -190,14 +190,10 @@ export default function FolderPicker() {
 
       await chrome.storage.local.set({ [SyncStorageKeys.FOLDER_NAME]: handle.name });
 
-      chrome.runtime.sendMessage({ type: 'gv.sync.localPickerComplete' });
-
       setStatus({ kind: 'connected', name: handle.name });
 
-      // Close the tab after a brief delay so the user sees the success state
-      setTimeout(() => {
-        window.close();
-      }, 600);
+      // Notify background — it auto-enables sync mode and closes this tab
+      chrome.runtime.sendMessage({ type: 'gv.sync.localPickerComplete' });
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         // User cancelled the picker — no error state needed

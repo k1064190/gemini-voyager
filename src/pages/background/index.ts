@@ -965,7 +965,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             return;
           }
           case 'gv.sync.localPickerComplete': {
+            // Auto-enable manual sync after folder selection
+            await localFolderSyncService.setMode('manual');
             sendResponse({ ok: true });
+            // Close the picker tab — Chrome will focus the previously active tab
+            if (sender.tab?.id) {
+              chrome.tabs.remove(sender.tab.id);
+            }
             return;
           }
         }
