@@ -36,11 +36,25 @@ let pendingSend = false;
 let pendingSendResetTimer: ReturnType<typeof setTimeout> | null = null;
 let sendClickListener: ((e: Event) => void) | null = null;
 let sendKeydownListener: ((e: KeyboardEvent) => void) | null = null;
+let sidebarNavClickListener: ((e: Event) => void) | null = null;
 
 const SEND_BUTTON_SELECTOR =
   'button[aria-label*="Send"], button[aria-label*="send"], ' +
   'button[data-tooltip*="Send"], button[data-tooltip*="send"], ' +
   '[data-send-button], .send-button';
+
+// Matches href values that navigate to an existing conversation, e.g.
+//   /app/<convId>, /u/0/app/<convId>, /gem/<gemId>/<convId>.
+// Used by the sidebar-click listener to recognise navigation clicks so they
+// can cancel a pendingSend claim before the URL change propagates.
+const CONVERSATION_HREF_PATTERN = /\/(u\/\d+\/)?(app|gem\/[^/]+)\/[^/?#]+/;
+
+// How long a send intent (pendingSend flag) survives without a URL change.
+// Gemini can take 30+ seconds to produce the first response for PDF/paper
+// analysis before updating the URL, so the window has to be comfortably
+// larger than the worst-case first-response latency. Cheap to keep because
+// sidebar clicks explicitly cancel pendingSend via sidebarNavClickListener.
+const PENDING_SEND_TIMEOUT_MS = 60_000;
 
 // ============================================================================
 // i18n helper
@@ -163,10 +177,34 @@ function schedulePendingSendReset(): void {
     if (isNewChatPath(window.location.pathname)) {
       clearPreparedInstructions();
     }
-  }, 4000);
+  }, PENDING_SEND_TIMEOUT_MS);
+}
+
+/**
+ * Returns true when the chat input has no user-authored text.
+ * Any stray instruction block from a prior prepareInputForSend call is
+ * stripped before checking so the guard reflects what the USER typed.
+ */
+function isInputEmpty(input: HTMLElement | null): boolean {
+  if (!input) return true;
+  return stripInstructionBlock(readInputText(input)).trim() === '';
 }
 
 function markPendingSend(input: HTMLElement | null): void {
+  // Don't prepend instructions into an empty input. Our capture-phase listener
+  // runs before Gemini's, so injecting here would turn a stray Enter on an
+  // empty textbox into an unintentional send of just the instructions block.
+  if (isInputEmpty(input)) {
+    // The input may still contain a stray instruction block from a prior send
+    // whose URL change never landed (e.g., transient send failure). If we just
+    // returned here, Gemini's own keydown handler would see the lingering
+    // block as a non-empty message and submit it. Strip it first so Gemini
+    // sees the input as empty too and skips the send.
+    if (input && hasInstructionBlock(readInputText(input))) {
+      setInputText(input, stripInstructionBlock(readInputText(input)));
+    }
+    return;
+  }
   prepareInputForSend(input);
   pendingSend = true;
   schedulePendingSendReset();
@@ -206,7 +244,7 @@ function extractGemMetadata(path: string): { isGem: boolean; gemId?: string } {
 }
 
 function setupSendDetection(): void {
-  if (sendClickListener || sendKeydownListener) return;
+  if (sendClickListener || sendKeydownListener || sidebarNavClickListener) return;
 
   sendClickListener = (e: Event) => {
     if (!selectedFolderId) return;
@@ -221,8 +259,33 @@ function setupSendDetection(): void {
     markPendingSend(e.target);
   };
 
+  // Capture-phase listener that cancels a pending send claim when the user
+  // clicks a sidebar conversation link. Without this, clicking an existing
+  // conversation while pendingSend is still true would misattribute that
+  // conversation to the selected folder once the URL change is detected.
+  sidebarNavClickListener = (e: Event) => {
+    if (!pendingSend) return;
+    // Only a plain left-click navigates the current tab. Middle-click (button 1),
+    // right-click (button 2), and modifier-key clicks (Ctrl/Cmd/Shift/Alt) open
+    // in a new tab/window or trigger context menus — the current tab's URL
+    // stays on /app, so pendingSend must NOT be cancelled for those.
+    if (!(e instanceof MouseEvent)) return;
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    // e.target may be an SVGElement (icon inside anchor) — use Element, not
+    // HTMLElement, so closest() works on the general Element hierarchy.
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a');
+    if (!link) return;
+    const href = link.getAttribute('href') ?? '';
+    if (CONVERSATION_HREF_PATTERN.test(href)) {
+      clearPendingSendState();
+    }
+  };
+
   document.addEventListener('click', sendClickListener, true);
   document.addEventListener('keydown', sendKeydownListener, true);
+  document.addEventListener('click', sidebarNavClickListener, true);
 }
 
 function teardownSendDetection(): void {
@@ -233,6 +296,10 @@ function teardownSendDetection(): void {
   if (sendKeydownListener) {
     document.removeEventListener('keydown', sendKeydownListener, true);
     sendKeydownListener = null;
+  }
+  if (sidebarNavClickListener) {
+    document.removeEventListener('click', sidebarNavClickListener, true);
+    sidebarNavClickListener = null;
   }
   clearPendingSendState();
 }
@@ -514,7 +581,20 @@ function handleNavigation(manager: FolderManager, prevPath: string, newPath: str
     removePicker();
     void injectPicker(manager);
   } else {
-    // Left the new-chat page — hide picker
+    // Left the new-chat page — clear any stale folder selection so follow-up
+    // messages on the resulting conversation page don't re-inject instructions.
+    // This covers two cases where Branch 1 above is skipped:
+    //   1. pendingSend timer fired before URL change caught up (slow responses).
+    //      TRADE-OFF: in this case the new conversation is NOT auto-assigned
+    //      to the folder — the assignment is dropped to keep follow-up
+    //      messages on the new conversation page free of instruction injection.
+    //      Users hitting first responses longer than PENDING_SEND_TIMEOUT_MS
+    //      (currently 60s) will need to drag the conversation into the folder
+    //      manually.
+    //   2. User navigated to an existing conversation via the sidebar without sending.
+    selectedFolderId = null;
+    selectedFolderName = null;
+    selectedFolderInstructions = null;
     clearPendingSendState();
     removePicker();
   }
@@ -552,10 +632,21 @@ function startURLWatcher(manager: FolderManager): void {
     handleNavigation(manager, prevPath, newPath);
   };
 
-  urlWatcherCheckFn = checkUrl;
+  // popstate / hashchange only fire for user-initiated history navigation
+  // (browser back/forward, anchor hash changes). Gemini's SPA uses
+  // history.pushState for its own URL updates, which does NOT fire these
+  // events. Therefore any popstate/hashchange we observe here means the user
+  // is moving away from the message they just sent — cancel pendingSend so
+  // the resulting URL change isn't misattributed to the folder assignment.
+  const onHistoryNav = () => {
+    clearPendingSendState();
+    checkUrl();
+  };
+
+  urlWatcherCheckFn = onHistoryNav;
   urlWatcherInterval = setInterval(checkUrl, 500);
-  window.addEventListener('popstate', checkUrl);
-  window.addEventListener('hashchange', checkUrl);
+  window.addEventListener('popstate', onHistoryNav);
+  window.addEventListener('hashchange', onHistoryNav);
 
   // Also check on initial load
   if (isNewChatPath(window.location.pathname)) {
