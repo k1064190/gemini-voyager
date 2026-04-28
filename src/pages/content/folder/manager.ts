@@ -4331,12 +4331,15 @@ export class FolderManager {
 
     let addedNewConversation = false;
     if (existingIndex === -1) {
-      // Add new conversation
+      // Set lastOpenedAt = addedAt so the sort time-fallback ranks the new
+      // conversation above older entries the user has already opened.
+      const now = Date.now();
       this.data.folderContents[folderId].push({
         conversationId,
         title,
         url,
-        addedAt: Date.now(),
+        addedAt: now,
+        lastOpenedAt: now,
         isGem,
         gemId,
       });

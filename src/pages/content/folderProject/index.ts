@@ -36,11 +36,20 @@ let pendingSend = false;
 let pendingSendResetTimer: ReturnType<typeof setTimeout> | null = null;
 let sendClickListener: ((e: Event) => void) | null = null;
 let sendKeydownListener: ((e: KeyboardEvent) => void) | null = null;
+let sidebarNavClickListener: ((e: Event) => void) | null = null;
 
 const SEND_BUTTON_SELECTOR =
   'button[aria-label*="Send"], button[aria-label*="send"], ' +
   'button[data-tooltip*="Send"], button[data-tooltip*="send"], ' +
   '[data-send-button], .send-button';
+
+// Sidebar conversation links: /app/<convId>, /u/0/app/<convId>, /gem/<gemId>/<convId>.
+// Used by sidebarNavClickListener to cancel pendingSend before URL change.
+const CONVERSATION_HREF_PATTERN = /\/(u\/\d+\/)?(app|gem\/[^/]+)\/[^/?#]+/;
+
+// pendingSend lifetime — must exceed worst-case first-response latency
+// (PDF/paper analysis can take 30+ s before URL updates).
+const PENDING_SEND_TIMEOUT_MS = 60_000;
 
 // ============================================================================
 // i18n helper
@@ -163,10 +172,25 @@ function schedulePendingSendReset(): void {
     if (isNewChatPath(window.location.pathname)) {
       clearPreparedInstructions();
     }
-  }, 4000);
+  }, PENDING_SEND_TIMEOUT_MS);
+}
+
+/** True when the input has no user text (stray instruction block stripped first). */
+function isInputEmpty(input: HTMLElement | null): boolean {
+  if (!input) return true;
+  return stripInstructionBlock(readInputText(input)).trim() === '';
 }
 
 function markPendingSend(input: HTMLElement | null): void {
+  // Empty input + Enter: do nothing, so Gemini's bubble-phase handler also
+  // sees an empty input. Strip any leftover block first (from a prior send
+  // whose URL change never landed) — otherwise Gemini would submit it alone.
+  if (isInputEmpty(input)) {
+    if (input && hasInstructionBlock(readInputText(input))) {
+      setInputText(input, stripInstructionBlock(readInputText(input)));
+    }
+    return;
+  }
   prepareInputForSend(input);
   pendingSend = true;
   schedulePendingSendReset();
@@ -206,7 +230,7 @@ function extractGemMetadata(path: string): { isGem: boolean; gemId?: string } {
 }
 
 function setupSendDetection(): void {
-  if (sendClickListener || sendKeydownListener) return;
+  if (sendClickListener || sendKeydownListener || sidebarNavClickListener) return;
 
   sendClickListener = (e: Event) => {
     if (!selectedFolderId) return;
@@ -221,8 +245,28 @@ function setupSendDetection(): void {
     markPendingSend(e.target);
   };
 
+  // Cancel pendingSend when user clicks a sidebar conversation link, so the
+  // resulting URL change isn't misattributed to the current send.
+  sidebarNavClickListener = (e: Event) => {
+    if (!pendingSend) return;
+    // Plain left-click only — middle/right/modifier clicks open new tabs and
+    // leave the current tab's URL on /app.
+    if (!(e instanceof MouseEvent)) return;
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    // Element (not HTMLElement) so closest() works on SVG icons inside <a>.
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a');
+    if (!link) return;
+    const href = link.getAttribute('href') ?? '';
+    if (CONVERSATION_HREF_PATTERN.test(href)) {
+      clearPendingSendState();
+    }
+  };
+
   document.addEventListener('click', sendClickListener, true);
   document.addEventListener('keydown', sendKeydownListener, true);
+  document.addEventListener('click', sidebarNavClickListener, true);
 }
 
 function teardownSendDetection(): void {
@@ -233,6 +277,10 @@ function teardownSendDetection(): void {
   if (sendKeydownListener) {
     document.removeEventListener('keydown', sendKeydownListener, true);
     sendKeydownListener = null;
+  }
+  if (sidebarNavClickListener) {
+    document.removeEventListener('click', sidebarNavClickListener, true);
+    sidebarNavClickListener = null;
   }
   clearPendingSendState();
 }
@@ -514,7 +562,14 @@ function handleNavigation(manager: FolderManager, prevPath: string, newPath: str
     removePicker();
     void injectPicker(manager);
   } else {
-    // Left the new-chat page — hide picker
+    // Left new-chat: clear folder selection so follow-up messages don't
+    // re-inject instructions. Trade-off: when Branch 1 was skipped because
+    // the >60s timer fired, the conversation is NOT auto-assigned (user
+    // must drag it manually) — the alternative would re-introduce follow-up
+    // injection on the new conversation page.
+    selectedFolderId = null;
+    selectedFolderName = null;
+    selectedFolderInstructions = null;
     clearPendingSendState();
     removePicker();
   }
@@ -552,10 +607,18 @@ function startURLWatcher(manager: FolderManager): void {
     handleNavigation(manager, prevPath, newPath);
   };
 
-  urlWatcherCheckFn = checkUrl;
+  // popstate / hashchange = user-initiated history nav (Gemini's SPA uses
+  // pushState, which doesn't fire either). Cancel pendingSend so the URL
+  // change isn't misattributed to the current send.
+  const onHistoryNav = () => {
+    clearPendingSendState();
+    checkUrl();
+  };
+
+  urlWatcherCheckFn = onHistoryNav;
   urlWatcherInterval = setInterval(checkUrl, 500);
-  window.addEventListener('popstate', checkUrl);
-  window.addEventListener('hashchange', checkUrl);
+  window.addEventListener('popstate', onHistoryNav);
+  window.addEventListener('hashchange', onHistoryNav);
 
   // Also check on initial load
   if (isNewChatPath(window.location.pathname)) {
