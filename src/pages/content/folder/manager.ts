@@ -4312,10 +4312,8 @@ export class FolderManager {
     );
 
     if (existingIndex === -1) {
-      // Add new conversation. Set lastOpenedAt alongside addedAt so the
-      // sortConversationsByPriority time-fallback ranks this freshly-created
-      // conversation above older entries the user has already opened
-      // (otherwise it lands somewhere in the middle of the folder).
+      // Set lastOpenedAt = addedAt so the sort time-fallback ranks the new
+      // conversation above older entries the user has already opened.
       const now = Date.now();
       this.data.folderContents[folderId].push({
         conversationId,
